@@ -1,0 +1,5 @@
+*.session
+*.db
+credentials.json
+__pycache__/
+.env
