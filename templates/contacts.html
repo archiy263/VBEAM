@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoiceMail AI - Contacts</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0b0f19; color: white; min-height: 100vh; overflow-x: hidden; }
+        .glass-panel { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); }
+        .glow-purple { position: absolute; top: -10%; left: -10%; width: 40vw; height: 40vw; background: rgba(147, 51, 234, 0.15); filter: blur(120px); border-radius: 50%; z-index: -1; pointer-events: none;}
+        .glow-blue { position: absolute; bottom: -10%; right: -10%; width: 40vw; height: 40vw; background: rgba(59, 130, 246, 0.15); filter: blur(120px); border-radius: 50%; z-index: -1; pointer-events: none;}
+        input { background: rgba(0, 0, 0, 0.2) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; color: white !important; transition: border-color 0.2s; }
+        input:focus { outline: none; border-color: #a855f7 !important; box-shadow: 0 0 0 1px #a855f7 !important; }
+    </style>
+</head>
+<body class="relative flex flex-col p-8 items-center">
+    <div class="glow-purple"></div>
+    <div class="glow-blue"></div>
+
+    <div class="w-full max-w-5xl z-10">
+        <div class="flex justify-between items-center mb-8">
+            <a href="/dashboard" class="inline-flex items-center text-white/50 hover:text-white transition-colors">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                Back to Dashboard
+            </a>
+            <a href="/logout" class="text-white/40 hover:text-white text-sm transition-colors">Log out</a>
+        </div>
+        
+        <div class="flex items-center gap-4 mb-10">
+            <div class="p-3 bg-purple-500/20 rounded-xl">
+                <svg class="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+            </div>
+            <div>
+                <h2 class="text-3xl font-light">Contacts Directory</h2>
+                <p class="text-white/50 text-sm mt-1">Manage VoiceMail recipients</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <div class="lg:col-span-1">
+                <div class="glass-panel p-6 rounded-2xl sticky top-8">
+                    <h3 class="text-lg font-medium mb-6 flex items-center gap-2">Add New Record</h3>
+                    <form onsubmit="handleAdd(event)" class="space-y-4">
+                        <div>
+                            <label class="block text-xs uppercase text-white/50 mb-1">Name (Spoken trigger)</label>
+                            <input type="text" id="add-name" required class="w-full rounded-lg px-4 py-3 text-sm" placeholder="e.g. John">
+                        </div>
+                        <div>
+                            <label class="block text-xs uppercase text-white/50 mb-1">Email Address</label>
+                            <input type="email" id="add-email" required class="w-full rounded-lg px-4 py-3 text-sm" placeholder="john@example.com">
+                        </div>
+                        <div>
+                            <label class="block text-xs uppercase text-white/50 mb-1">Telegram @Username (Optional)</label>
+                            <input type="text" id="add-telegram" class="w-full rounded-lg px-4 py-3 text-sm" placeholder="@johndoe">
+                        </div>
+                        <button type="submit" class="w-full mt-4 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:opacity-90 text-white font-medium py-3 rounded-xl transition-opacity">
+                            Save Contact
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2 space-y-4" id="contacts-list">
+                <div class="animate-pulse space-y-4">
+                    <div class="h-24 bg-white/5 rounded-2xl w-full"></div>
+                    <div class="h-24 bg-white/5 rounded-2xl w-full"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadContacts() {
+            const list = document.getElementById('contacts-list');
+            try {
+                const res = await fetch('/api/contacts');
+                const contacts = await res.json();
+                
+                if(Object.keys(contacts).length === 0) {
+                    list.innerHTML = `
+                    <div class="glass-panel p-12 rounded-2xl text-center text-white/40 border border-white/5 border-dashed">
+                        <p>No contacts saved yet.</p>
+                        <p class="text-sm mt-2">Add a contact to the left to start sending messages easily via voice.</p>
+                    </div>`;
+                    return;
+                }
+                
+                let html = '';
+                for(const [cname, details] of Object.entries(contacts)) {
+                    html += `
+                    <div class="glass-panel p-6 rounded-2xl flex items-center justify-between group">
+                        <div>
+                            <h3 class="text-xl font-medium capitalize text-white mb-2">${cname}</h3>
+                            <div class="flex flex-col sm:flex-row sm:gap-6 gap-2 text-sm text-white/60">
+                                <span class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-fuchsia-400"></span>${details.email}</span>
+                                ${details.telegram ? `<span class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-blue-400"></span>${details.telegram}</span>` : ''}
+                            </div>
+                        </div>
+                        <button onclick="handleDelete('${cname}')" class="p-3 text-red-400 hover:bg-red-400/10 rounded-xl transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">
+                            Delete
+                        </button>
+                    </div>`;
+                }
+                list.innerHTML = html;
+            } catch(e) {
+                list.innerHTML = `<div class="glass-panel p-6 border-red-500/30 bg-red-500/10 text-red-200">Error loading contacts.</div>`;
+            }
+        }
+
+        async function handleAdd(e) {
+            e.preventDefault();
+            const payload = {
+                name: document.getElementById('add-name').value,
+                email: document.getElementById('add-email').value,
+                telegram_username: document.getElementById('add-telegram').value || null
+            };
+            await fetch('/api/contacts/add', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+            e.target.reset();
+            loadContacts();
+        }
+
+        async function handleDelete(name) {
+            await fetch('/api/contacts/delete', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name}) });
+            loadContacts();
+        }
+
+        loadContacts();
+    </script>
+</body>
+</html>

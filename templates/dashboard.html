@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoiceMail AI - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0f19;
+            color: white;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.09);
+            transform: translateY(-2px);
+            transition: all 0.2s;
+        }
+
+        .glow-purple { position: absolute; top: -10%; left: -10%; width: 45vw; height: 45vw; background: rgba(147,51,234,0.15); filter: blur(120px); border-radius:50%; pointer-events:none; z-index:-1;}
+        .glow-blue   { position: absolute; bottom:-10%; right:-10%; width: 45vw; height: 45vw; background: rgba(59,130,246,0.15); filter: blur(120px); border-radius:50%; pointer-events:none; z-index:-1;}
+
+        /* Orb */
+        .orb-container { position:relative; width:140px; height:140px; display:flex; justify-content:center; align-items:center; margin:0 auto; cursor:pointer; }
+        .orb-core { width:90px; height:90px; border-radius:50%; background:radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), rgba(147,51,234,0.6) 40%, rgba(59,130,246,0.4) 80%); box-shadow:0 0 40px rgba(147,51,234,0.5),inset 0 0 20px rgba(255,255,255,0.4); position:relative; z-index:10; transition:all 0.4s cubic-bezier(0.4,0,0.2,1); }
+        .orb-ring { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); border-radius:50%; background:conic-gradient(from 0deg, rgba(236,72,153,0), rgba(147,51,234,0.5), rgba(59,130,246,0.8), rgba(236,72,153,0)); filter:blur(8px); opacity:0.5; z-index:5; width:100px; height:100px; transition:all 0.3s ease; }
+
+        .orb-idle .orb-core { animation:float 4s ease-in-out infinite; box-shadow:0 0 20px rgba(59,130,246,0.3); }
+        .orb-listening .orb-core { animation:pulse-core 1.2s ease-in-out infinite alternate; box-shadow:0 0 60px rgba(236,72,153,0.9),inset 0 0 30px rgba(255,255,255,0.6); }
+        .orb-listening .orb-ring { animation:spin 2.5s linear infinite, pulse-ring 1.2s ease-in-out infinite alternate; width:155px; height:155px; opacity:1; }
+        
+        @keyframes float { 0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-10px) scale(0.98)} }
+        @keyframes spin { 100%{transform:translate(-50%,-50%) rotate(360deg)} }
+        @keyframes pulse-core { 0%{transform:scale(1);filter:brightness(1)}100%{transform:scale(1.18);filter:brightness(1.3)} }
+        @keyframes pulse-ring { 0%{transform:translate(-50%,-50%) scale(1);opacity:0.7}100%{transform:translate(-50%,-50%) scale(1.22);opacity:1;filter:blur(14px)} }
+
+        select, option { background: #0f1929; color: white; }
+
+        .cmd-chip {
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 20px;
+            padding: 6px 14px;
+            font-size: 0.78rem;
+            color: rgba(255,255,255,0.75);
+            cursor: default;
+            display: inline-block;
+            margin: 4px;
+            white-space: nowrap;
+        }
+        .cmd-group { margin-bottom: 12px; }
+        .cmd-group-title { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.35); margin-bottom: 6px; margin-left: 2px; }
+    </style>
+</head>
+<body class="relative flex flex-col items-center">
+
+    <div class="glow-purple"></div>
+    <div class="glow-blue"></div>
+
+    <!-- Header -->
+    <header class="w-full max-w-5xl flex justify-between items-center p-6 pb-4 z-10">
+        <h1 class="text-xl font-light tracking-wide bg-gradient-to-r from-blue-400 to-fuchsia-400 text-transparent bg-clip-text">VoiceMail AI</h1>
+        <div class="flex items-center gap-3">
+            <!-- Language selector with proper BCP-47 values -->
+            <select id="lang-select" class="bg-white/10 border border-white/20 text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-purple-500">
+                <option value="en-IN">English 🇮🇳</option>
+                <option value="hi-IN">हिंदी 🇮🇳</option>
+            </select>
+            <a href="/logout" class="text-white/50 hover:text-white transition-colors text-sm">Log out</a>
+        </div>
+    </header>
+
+    <main class="w-full max-w-5xl px-6 z-10 flex flex-col items-center pb-20">
+
+        <!-- Nav Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 w-full mb-10">
+            <a href="/profile" class="glass-card p-5 flex flex-col items-center text-center rounded-2xl group">
+                <div class="bg-blue-500/20 p-3 rounded-full mb-2 group-hover:bg-blue-500/40 transition-colors">
+                    <svg class="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                </div>
+                <span class="text-sm font-medium">Profile</span>
+            </a>
+            <a href="/inbox" class="glass-card p-5 flex flex-col items-center text-center rounded-2xl group">
+                <div class="bg-fuchsia-500/20 p-3 rounded-full mb-2 group-hover:bg-fuchsia-500/40 transition-colors">
+                    <svg class="w-6 h-6 text-fuchsia-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                </div>
+                <span class="text-sm font-medium">Inbox</span>
+            </a>
+            <a href="/contacts" class="glass-card p-5 flex flex-col items-center text-center rounded-2xl group">
+                <div class="bg-purple-500/20 p-3 rounded-full mb-2 group-hover:bg-purple-500/40 transition-colors">
+                    <svg class="w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </div>
+                <span class="text-sm font-medium">Contacts</span>
+            </a>
+            <a href="/admin" class="glass-card p-5 flex flex-col items-center text-center rounded-2xl group">
+                <div class="bg-gray-500/20 p-3 rounded-full mb-2 group-hover:bg-gray-500/40 transition-colors">
+                    <svg class="w-6 h-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.95 11.95 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                </div>
+                <span class="text-sm font-medium">Security</span>
+            </a>
+            <div id="telegram-nav-card" onclick="openTelegramModal()" class="glass-card p-5 flex flex-col items-center text-center rounded-2xl group cursor-pointer relative">
+                <div id="telegram-indicator" class="absolute top-3 right-3 w-2.5 h-2.5 rounded-full bg-red-500 shadow-lg shadow-red-500/50"></div>
+                <div class="bg-blue-500/20 p-3 rounded-full mb-2 group-hover:bg-blue-500/40 transition-colors">
+                    <svg class="w-6 h-6 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.892-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+                    </svg>
+                </div>
+                <span id="telegram-nav-text" class="text-sm font-medium">Link Telegram</span>
+            </div>
+        </div>
+
+        <!-- Assistant Response Box -->
+        <div id="ai-response-container" class="w-full max-w-xl mb-2 hidden">
+            <div id="ai-response-box" class="glass-card p-5 rounded-2xl">
+                <p class="text-white/40 text-xs uppercase tracking-wider mb-1.5 font-medium">Assistant</p>
+                <p id="ai-response-text" class="text-sm font-light leading-relaxed"
+                   style="white-space:pre-wrap; word-break:break-word; overflow-wrap:anywhere; max-height:320px; overflow-y:auto; font-family:monospace;"></p>
+            </div>
+        </div>
+
+        <!-- TTS Controls -->
+        <div id="tts-controls" class="hidden flex items-center gap-3 mb-6">
+            <button onclick="window.speechSynthesis.resume()" title="Play"
+                class="bg-white/10 hover:bg-white/20 text-white rounded-full w-9 h-9 flex items-center justify-center transition-colors">
+                ▶
+            </button>
+            <button onclick="window.speechSynthesis.pause()" title="Pause"
+                class="bg-white/10 hover:bg-white/20 text-white rounded-full w-9 h-9 flex items-center justify-center transition-colors">
+                ⏸
+            </button>
+            <button onclick="window.speechSynthesis.cancel(); document.getElementById('tts-controls').classList.add('hidden')" title="Stop"
+                class="bg-red-500/30 hover:bg-red-500/50 text-white rounded-full w-9 h-9 flex items-center justify-center transition-colors">
+                ⏹
+            </button>
+            <span class="text-white/30 text-xs">TTS Controls</span>
+        </div>
+
+        <!-- Voice Orb -->
+        <div class="flex flex-col items-center w-full">
+            <div id="orb" class="orb-container orb-idle" onclick="startListening()">
+                <div class="orb-ring"></div>
+                <div class="orb-core"></div>
+            </div>
+
+            <div class="mt-6 text-center min-h-[40px] w-full max-w-md">
+                <p id="mic-status" class="text-white/40 text-sm tracking-wide">Tap the orb and speak a command</p>
+                <p id="heard-text" class="text-white/60 text-sm italic mt-1 hidden"></p>
+            </div>
+
+            <!-- Manual text input: appears when assistant is waiting for a reply -->
+            <div id="manual-input-row" class="hidden flex flex-col items-center w-full max-w-md mt-4 gap-2">
+                <p class="text-white/40 text-xs">Or type your response below:</p>
+                <div class="flex w-full gap-2">
+                    <input id="manual-input" type="text" placeholder="Type here..."
+                        class="flex-1 bg-white/10 border border-white/20 text-white rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                        onkeydown="if(event.key==='Enter') sendManualInput()" />
+                    <button onclick="sendManualInput()"
+                        class="bg-purple-600 hover:bg-purple-700 text-white rounded-xl px-4 py-2 text-sm font-medium transition-colors">
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===  FULL COMMAND REFERENCE === -->
+        <div class="w-full max-w-4xl mt-12">
+            <div class="glass-card rounded-2xl p-6">
+                <h3 class="text-base font-medium mb-1">📋 All Voice Commands</h3>
+                <p class="text-white/40 text-xs mb-6">Speak these exact phrases after tapping the orb. Hindi &amp; Gujarati commands also accepted.</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                    <div class="cmd-group">
+                        <div class="cmd-group-title">🟢 Start / Stop</div>
+                        <span class="cmd-chip">"start"</span>
+                        <span class="cmd-chip">"start assistant"</span>
+                        <span class="cmd-chip">"stop"</span>
+                        <span class="cmd-chip">"exit"</span>
+                        <span class="cmd-chip">"शुरू करो"</span>
+                        <span class="cmd-chip">"बंद करो"</span>
+                    </div>
+
+                    <div class="cmd-group">
+                        <div class="cmd-group-title">📧 Email — Read</div>
+                        <span class="cmd-chip">"read email"</span>
+                        <span class="cmd-chip">"read my email"</span>
+                        <span class="cmd-chip">"read latest email"</span>
+                        <span class="cmd-chip">"how many emails"</span>
+                        <span class="cmd-chip">"ईमेल पढ़ो"</span>
+                        <span class="cmd-chip">"कितने ईमेल"</span>
+                    </div>
+
+                    <div class="cmd-group">
+                        <div class="cmd-group-title">📤 Email — Send</div>
+                        <span class="cmd-chip">"send email"</span>
+                        <span class="cmd-chip">"compose email"</span>
+                        <span class="cmd-chip">"write email"</span>
+                        <span class="cmd-chip">"ईमेल भेजो"</span>
+                        <br><small class="text-white/30 text-xs ml-1">→ then say recipient name → subject → body → yes</small>
+                    </div>
+
+                    <div class="cmd-group">
+                        <div class="cmd-group-title">↩️ Email — Reply</div>
+                        <span class="cmd-chip">"reply email"</span>
+                        <span class="cmd-chip">"reply latest"</span>
+                        <span class="cmd-chip">"reply to [name]"</span>
+                        <span class="cmd-chip">"ईमेल का जवाब"</span>
+                    </div>
+
+                    <div class="cmd-group">
+                        <div class="cmd-group-title">💬 Telegram</div>
+                        <span class="cmd-chip">"read telegram"</span>
+                        <span class="cmd-chip">"check telegram"</span>
+                        <span class="cmd-chip">"send telegram [name] [msg]"</span>
+                        <span class="cmd-chip">"टेलीग्राम पढ़ो"</span>
+                        <span class="cmd-chip">"टेलीग्राम भेजो"</span>
+                    </div>
+
+                    <div class="cmd-group">
+                        <div class="cmd-group-title">👥 Contacts</div>
+                        <span class="cmd-chip">"show contacts"</span>
+                        <span class="cmd-chip">"all contact"</span>
+                        <span class="cmd-chip">"add contact [name] [email]"</span>
+                        <span class="cmd-chip">"delete contact [name]"</span>
+                        <span class="cmd-chip">"सभी संपर्क"</span>
+                    </div>
+
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-white/10">
+                    <p class="text-white/30 text-xs">💡 <strong class="text-white/50">Tip:</strong> After "send email" you'll be guided step-by-step: recipient → subject → message → say <em>"yes"</em> → say your 4-digit PIN to confirm.</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- TELEGRAM LOGIN MODAL -->
+    <div id="telegramModal" class="fixed inset-0 z-50 hidden flex flex-col items-center justify-center p-4">
+        <!-- Backdrop -->
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeTelegramModal()"></div>
+        <!-- Modal Content -->
+        <div class="glass-card bg-[#0b0f19] relative w-full max-w-md p-8 rounded-3xl shadow-[0_0_50px_rgba(59,130,246,0.15)] transform transition-all z-10 border border-white/10">
+            <button onclick="closeTelegramModal()" class="absolute top-5 right-5 text-white/50 hover:text-white transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <div id="tg-step-1">
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="p-3 bg-blue-500/20 rounded-full">
+                        <svg class="w-7 h-7 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.892-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+                        </svg>
+                    </div>
+                    <h2 class="text-2xl font-light">Link Telegram</h2>
+                </div>
+                <p class="text-sm text-white/50 mb-6 leading-relaxed">Enter your phone number with country code (e.g. +91...) to authorize the voice assistant.</p>
+                
+                <form id="tg-phone-form" onsubmit="handleTgPhoneSubmit(event)">
+                    <input type="text" id="tg-phone" placeholder="+91 90000 00000" required
+                        class="w-full bg-white/5 border border-white/10 text-white rounded-xl px-4 py-3.5 mb-4 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors">
+                    <button type="submit" id="tg-btn-1" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3.5 rounded-xl transition-colors shadow-lg shadow-blue-600/20">
+                        Send OTP
+                    </button>
+                </form>
+                <p id="tg-error-1" class="text-red-400 text-sm mt-3 hidden"></p>
+            </div>
+            
+            <div id="tg-step-2" class="hidden">
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="p-3 bg-blue-500/20 rounded-full">
+                        <svg class="w-7 h-7 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                    </div>
+                    <h2 class="text-2xl font-light">Check Telegram</h2>
+                </div>
+                <p class="text-sm text-white/50 mb-6 leading-relaxed">We've sent a login code to your Telegram app. Enter it below.</p>
+                <form id="tg-code-form" onsubmit="handleTgCodeSubmit(event)">
+                    <input type="text" id="tg-code" placeholder="1 2 3 4 5" required autocomplete="off"
+                        class="w-full bg-white/5 border border-white/10 text-white rounded-xl px-4 py-3.5 mb-4 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 tracking-[0.5em] text-center text-xl font-mono transition-colors">
+                    <button type="submit" id="tg-btn-2" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3.5 rounded-xl transition-colors shadow-lg shadow-blue-600/20">
+                        Verify Code
+                    </button>
+                </form>
+                <p id="tg-error-2" class="text-red-400 text-sm mt-3 hidden"></p>
+            </div>
+            
+            <div id="tg-step-password" class="hidden">
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="p-3 bg-blue-500/20 rounded-full">
+                        <svg class="w-7 h-7 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                    </div>
+                    <h2 class="text-2xl font-light">2-Step Verification</h2>
+                </div>
+                <p class="text-sm text-white/50 mb-6 leading-relaxed">Your account is protected by an additional password. Enter it below.</p>
+                <form id="tg-password-form" onsubmit="handleTgPasswordSubmit(event)">
+                    <input type="password" id="tg-password" placeholder="Your Telegram Password" required
+                        class="w-full bg-white/5 border border-white/10 text-white rounded-xl px-4 py-3.5 mb-4 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors">
+                    <button type="submit" id="tg-btn-password" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3.5 rounded-xl transition-colors shadow-lg shadow-blue-600/20">
+                        Submit Password
+                    </button>
+                </form>
+                <p id="tg-error-password" class="text-red-400 text-sm mt-3 hidden"></p>
+            </div>
+            
+            <div id="tg-step-success" class="hidden text-center py-6">
+                <div class="mx-auto flex flex-col items-center justify-center p-6 bg-green-500/10 rounded-3xl mb-6 border border-green-500/20">
+                    <svg class="w-12 h-12 text-green-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <h2 class="text-2xl font-medium mb-2 text-white">Connected!</h2>
+                    <p class="text-white/60 text-sm">Your Telegram account is now securely linked.</p>
+                </div>
+                <button onclick="closeTelegramModal()" class="w-full bg-white/10 hover:bg-white/20 text-white py-3.5 px-6 rounded-xl transition-colors font-medium">Continue</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =============================================
+        // LANG MAPPING: dropdown value → BCP-47 for SpeechRecognition
+        // =============================================
+        // The dropdown values ARE already BCP-47 (en-IN, hi-IN, gu-IN)
+        // We map them to a short code for the backend
+        const langToBackend = {
+            "en-IN": "en",
+            "hi-IN": "hi"
+        };
+
+        let isListening = false;
+        let currentRecognition = null;
+
+        let voiceList = [];
+        // Pre-load voice list (Chrome requires this trigger)
+        function loadVoices() {
+            voiceList = window.speechSynthesis.getVoices();
+        }
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+        loadVoices();
+
+        function getBestVoice(bcp47) {
+            if (voiceList.length === 0) voiceList = window.speechSynthesis.getVoices();
+            const lang2 = bcp47.split('-')[0]; // e.g. 'hi' from 'hi-IN'
+            // Try exact match first (e.g. 'hi-IN')
+            let v = voiceList.find(v => v.lang === bcp47);
+            // Try language prefix match (e.g. 'hi')
+            if (!v) v = voiceList.find(v => v.lang.startsWith(lang2));
+            // Fallback to any Indian voice for Indian scripts
+            if (!v && ['hi'].includes(lang2)) v = voiceList.find(v => v.lang.includes('IN'));
+            return v || null;
+        }
+
+        function speakText(text, bcp47) {
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = bcp47 || 'en-IN';
+            u.rate = 0.9;
+            u.pitch = 1.0;
+            const voice = getBestVoice(bcp47 || 'en-IN');
+            if (voice) u.voice = voice;
+            window.speechSynthesis.speak(u);
+
+            document.getElementById('ai-response-container').classList.remove('hidden');
+            // Format email output nicely in the box
+            document.getElementById('ai-response-text').innerText = text;
+        }
+
+        function setStatus(msg) {
+            document.getElementById('mic-status').innerHTML = msg;
+        }
+
+        function setHeardText(t) {
+            const el = document.getElementById('heard-text');
+            el.innerText = '"' + t + '"';
+            el.classList.remove('hidden');
+        }
+
+        function startListening() {
+            if (isListening) return;
+
+            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRec) {
+                speakText("Speech recognition is not supported in this browser. Please use Chrome.", "en-IN");
+                return;
+            }
+
+            const bcp47Lang = document.getElementById('lang-select').value; // e.g. "hi-IN"
+            const backendLang = langToBackend[bcp47Lang] || "en";
+
+            const rec = new SpeechRec();
+            rec.lang = bcp47Lang;       // ← Critical fix: use correct BCP-47 code
+            rec.continuous = false;     // single-shot: cleaner, avoids partial results
+            rec.interimResults = false;
+            rec.maxAlternatives = 3;    // get up to 3 guesses
+
+            currentRecognition = rec;
+
+            const orb = document.getElementById('orb');
+
+            rec.onstart = () => {
+                isListening = true;
+                orb.classList.remove('orb-idle');
+                orb.classList.add('orb-listening');
+                setStatus('<span class="text-fuchsia-400 animate-pulse font-medium">🎙️ Listening...</span>');
+                document.getElementById('heard-text').classList.add('hidden');
+            };
+
+            rec.onresult = async (event) => {
+                // Try all alternatives to find a matching command
+                let transcript = "";
+                for (let i = 0; i < event.results[0].length; i++) {
+                    transcript = event.results[0][i].transcript.toLowerCase().trim();
+                    if (transcript) break;
+                }
+
+                setHeardText(transcript);
+                setStatus('Processing...');
+
+                try {
+                    const res = await fetch('/api/command', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ command: transcript, language: backendLang })
+                    });
+
+                    const data = await res.json();
+
+                    if (!res.ok) {
+                        speakText(data.response || "Server error", bcp47Lang);
+                        return;
+                    }
+
+                    if (data.response && data.response !== "Command not understood") {
+                        // Navigate on voice commands
+                        if (transcript.includes('open inbox') || transcript.includes('inbox')) {
+                            if (transcript.includes('open')) window.location.href = '/inbox';
+                        }
+                        if (transcript.includes('open profile') || transcript.includes('profile')) {
+                            if (transcript.includes('open')) window.location.href = '/profile';
+                        }
+
+                        speakText(data.response, data.language === "en" ? "en-IN" : (data.language === "hi" ? "hi-IN" : "gu-IN"));
+                        setStatus('Tap the orb to speak again');
+                    } else {
+                        document.getElementById('ai-response-container').classList.remove('hidden');
+                        document.getElementById('ai-response-text').innerText = '❓ Try saying something from the command list below.';
+                        setStatus('Tap the orb to try again');
+                    }
+
+                } catch (err) {
+                    speakText("Network error. Is the server running?", "en-IN");
+                    setStatus('<span class="text-red-400">Server offline. Restart with python main.py</span>');
+                }
+            };
+
+            rec.onerror = (e) => {
+                isListening = false;
+                orb.classList.add('orb-idle');
+                orb.classList.remove('orb-listening');
+                if (e.error === 'no-speech') {
+                    setStatus('Nothing heard. Tap the orb to try again.');
+                } else if (e.error === 'not-allowed') {
+                    setStatus('<span class="text-red-400">Microphone permission denied. Allow it in browser settings.</span>');
+                } else {
+                    setStatus(`Error: ${e.error}. Tap to retry.`);
+                }
+            };
+
+            rec.onend = () => {
+                isListening = false;
+                orb.classList.add('orb-idle');
+                orb.classList.remove('orb-listening');
+            };
+
+            try { rec.start(); } catch(e) { console.error(e); }
+        }
+
+        // ---- Detect if assistant is mid-flow (waiting for text input) ----
+        const STEP_PROMPTS = [
+            "tell recipient", "contact name", "email address",
+            "tell subject", "tell message", "tell your reply",
+            "say your 4-digit", "say yes to confirm",
+            "send telegram to", "telegram @username",
+            "message should i send", "sending to"
+        ];
+        function checkForStepPrompt(text) {
+            const lower = text.toLowerCase();
+            return STEP_PROMPTS.some(p => lower.includes(p));
+        }
+        function showManualInput() {
+            const row = document.getElementById('manual-input-row');
+            row.classList.remove('hidden');
+            document.getElementById('manual-input').focus();
+        }
+        function hideManualInput() {
+            document.getElementById('manual-input-row').classList.add('hidden');
+            document.getElementById('manual-input').value = '';
+        }
+
+        async function sendManualInput() {
+            const input = document.getElementById('manual-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const bcp47Lang = document.getElementById('lang-select').value;
+            const backendLang = langToBackend[bcp47Lang] || 'en';
+
+            setHeardText(text);
+            setStatus('Processing...');
+            input.value = '';
+
+            try {
+                const res = await fetch('/api/command', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ command: text, language: backendLang })
+                });
+                const data = await res.json();
+                const reply = data.response || 'No response';
+                speakText(reply, bcp47Lang);
+
+                if (checkForStepPrompt(reply)) {
+                    showManualInput();
+                } else {
+                    hideManualInput();
+                    setStatus('Tap the orb to speak again');
+                }
+            } catch (err) {
+                setStatus('<span class="text-red-400">Error sending. Is server running?</span>');
+            }
+        }
+
+        // Patch speakText result handler to show/hide manual input
+        const _origFetch = window.fetch;
+        // Patch inside startListening result handler:
+        function handleResponse(data, bcp47Lang) {
+            const reply = data.response || '';
+            if (reply && reply !== 'Command not understood') {
+                speakText(reply, bcp47Lang);
+                if (checkForStepPrompt(reply)) {
+                    showManualInput();
+                } else {
+                    hideManualInput();
+                    setStatus('Tap the orb to speak again');
+                }
+            } else {
+                document.getElementById('ai-response-container').classList.remove('hidden');
+                document.getElementById('ai-response-text').innerText = '❓ Try saying something from the command list below.';
+                hideManualInput();
+                setStatus('Tap the orb to try again');
+            }
+        }
+
+        // Restore language from localStorage on load
+        const savedLang = localStorage.getItem('voicemail_lang');
+        if (savedLang) document.getElementById('lang-select').value = savedLang;
+        document.getElementById('lang-select').addEventListener('change', e => {
+            localStorage.setItem('voicemail_lang', e.target.value);
+        });
+    </script>
+
+    <!-- Definitive startListening with race-condition & silence-debounce fix -->
+    <script>
+        startListening = function() {
+            if (isListening) return;
+            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRec) {
+                speakText("Browser doesn't support speech recognition. Please use Chrome.", "en-IN");
+                return;
+            }
+            const bcp47Lang = document.getElementById('lang-select').value;
+            const backendLang = langToBackend[bcp47Lang] || "en";
+            const rec = new SpeechRec();
+            rec.lang = bcp47Lang;
+            
+            // USE CONTINUOUS + INTERIM TO CAPTURE FULL SENTENCES
+            rec.continuous = true;
+            rec.interimResults = true;
+            rec.maxAlternatives = 1;
+            
+            currentRecognition = rec;
+            const orb = document.getElementById('orb');
+
+            let resultSent = false;
+            let silenceTimer = null;
+
+            rec.onstart = () => {
+                isListening = true;
+                resultSent = false;
+                orb.classList.remove('orb-idle');
+                orb.classList.add('orb-listening');
+                setStatus('<span class="text-fuchsia-400 animate-pulse font-medium">🎙️ Listening...</span>');
+                document.getElementById('heard-text').classList.add('hidden');
+            };
+
+            rec.onresult = async (event) => {
+                if (resultSent) return;
+
+                let finalTranscript = '';
+                let interimTranscript = '';
+
+                // Combine results accurately
+                for (let i = event.resultIndex; i < event.results.length; ++i) {
+                    if (event.results[i].isFinal) {
+                        finalTranscript += event.results[i][0].transcript;
+                    } else {
+                        interimTranscript += event.results[i][0].transcript;
+                    }
+                }
+                
+                const transcript = (finalTranscript || interimTranscript || "").toLowerCase().trim();
+                setHeardText(transcript);
+                
+                // Clear the previous silence timer since the user is still speaking
+                clearTimeout(silenceTimer);
+                
+                // Set a 1.5 second silence timeout to auto-submit
+                silenceTimer = setTimeout(async () => {
+                    if (resultSent) return;
+                    resultSent = true;
+                    rec.stop(); // Manually stop listening
+                    
+                    setStatus('Processing...');
+                    try {
+                        const res = await fetch('/api/command', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ command: transcript, language: backendLang })
+                        });
+                        const data = await res.json();
+                        if (!res.ok) { speakText(data.response || "Server error", bcp47Lang); return; }
+                        handleResponse(data, bcp47Lang);
+                    } catch (err) {
+                        speakText("Network error. Is the server running?", "en-IN");
+                        setStatus('<span class="text-red-400">Server offline.</span>');
+                    }
+                }, 1500); // Wait 1.5s for silence before submitting
+            };
+
+            rec.onerror = (e) => {
+                isListening = false;
+                orb.classList.add('orb-idle');
+                orb.classList.remove('orb-listening');
+                if (e.error === 'no-speech') setStatus('Nothing heard. Tap to try again.');
+                else if (e.error === 'not-allowed') setStatus('<span class="text-red-400">Mic blocked. Allow in browser settings.</span>');
+                else setStatus(`Error: ${e.error}`);
+            };
+            rec.onend = () => {
+                isListening = false;
+                orb.classList.add('orb-idle');
+                orb.classList.remove('orb-listening');
+            };
+            try { rec.start(); } catch(e) { console.error(e); }
+        };
+
+        // Show TTS controls whenever assistant speaks
+        const _origSpeakText = speakText;
+        speakText = function(text, bcp47) {
+            _origSpeakText(text, bcp47);
+            document.getElementById('tts-controls').classList.remove('hidden');
+        };
+
+        // =============================================
+        // TELEGRAM WEB AUTH LOGIC
+        // =============================================
+        async function checkTelegramStatus() {
+            try {
+                const res = await fetch('/api/telegram/status');
+                const data = await res.json();
+                const indicator = document.getElementById('telegram-indicator');
+                const text = document.getElementById('telegram-nav-text');
+                if (data.connected) {
+                    indicator.classList.remove('bg-red-500', 'shadow-red-500/50');
+                    indicator.classList.add('bg-green-500', 'shadow-green-500/50');
+                    text.innerText = "Telegram Connected";
+                    document.getElementById('telegram-nav-card').onclick = () => { speakText("Telegram is already connected.", "en"); };
+                }
+            } catch(e) {}
+        }
+        
+        function openTelegramModal() {
+            if(document.getElementById('telegram-nav-text').innerText === "Telegram Connected") return;
+            document.getElementById('telegramModal').classList.remove('hidden');
+        }
+        function closeTelegramModal() {
+            document.getElementById('telegramModal').classList.add('hidden');
+        }
+        
+        async function handleTgPhoneSubmit(e) {
+            e.preventDefault();
+            const phone = document.getElementById('tg-phone').value;
+            const btn = document.getElementById('tg-btn-1');
+            const err = document.getElementById('tg-error-1');
+            btn.innerHTML = 'Sending...'; err.classList.add('hidden');
+            
+            try {
+                const res = await fetch('/api/telegram/send_code', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({phone})
+                });
+                const data = await res.json();
+                if(data.success) {
+                    document.getElementById('tg-step-1').classList.add('hidden');
+                    document.getElementById('tg-step-2').classList.remove('hidden');
+                    document.getElementById('tg-code').focus();
+                } else {
+                    err.innerText = data.error || 'Failed to send code.';
+                    err.classList.remove('hidden');
+                }
+            } catch(ex) { err.innerText = 'Network error.'; err.classList.remove('hidden'); }
+            finally { btn.innerHTML = 'Send OTP'; }
+        }
+        
+        async function handleTgCodeSubmit(e) {
+            e.preventDefault();
+            const code = document.getElementById('tg-code').value;
+            const btn = document.getElementById('tg-btn-2');
+            const err = document.getElementById('tg-error-2');
+            btn.innerHTML = 'Verifying...'; err.classList.add('hidden');
+            
+            try {
+                const res = await fetch('/api/telegram/verify_code', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({code})
+                });
+                const data = await res.json();
+                if(data.success) {
+                    document.getElementById('tg-step-2').classList.add('hidden');
+                    document.getElementById('tg-step-success').classList.remove('hidden');
+                    checkTelegramStatus();
+                } else if(data.needs_password) {
+                    document.getElementById('tg-step-2').classList.add('hidden');
+                    document.getElementById('tg-step-password').classList.remove('hidden');
+                    document.getElementById('tg-password').focus();
+                } else {
+                    err.innerText = data.error || 'Invalid code.';
+                    err.classList.remove('hidden');
+                }
+            } catch(ex) { err.innerText = 'Network error.'; err.classList.remove('hidden'); }
+            finally { btn.innerHTML = 'Verify Code'; }
+        }
+
+        async function handleTgPasswordSubmit(e) {
+            e.preventDefault();
+            const password = document.getElementById('tg-password').value;
+            const btn = document.getElementById('tg-btn-password');
+            const err = document.getElementById('tg-error-password');
+            btn.innerHTML = 'Verifying...'; err.classList.add('hidden');
+            
+            try {
+                const res = await fetch('/api/telegram/verify_password', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({password})
+                });
+                const data = await res.json();
+                if(data.success) {
+                    document.getElementById('tg-step-password').classList.add('hidden');
+                    document.getElementById('tg-step-success').classList.remove('hidden');
+                    checkTelegramStatus();
+                } else {
+                    err.innerText = data.error || 'Invalid password.';
+                    err.classList.remove('hidden');
+                }
+            } catch(ex) { err.innerText = 'Network error.'; err.classList.remove('hidden'); }
+            finally { btn.innerHTML = 'Submit Password'; }
+        }
+
+        // Check on load
+        window.addEventListener('DOMContentLoaded', checkTelegramStatus);
+    </script>
+</body>
+</html>

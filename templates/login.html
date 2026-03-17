@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoiceMail AI - Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0f19;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        /* Glassmorphism utility */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        /* Ambient Glows */
+        .glow-purple {
+            position: absolute;
+            top: -10%; left: -10%;
+            width: 50vw; height: 50vw;
+            background: rgba(147, 51, 234, 0.2);
+            filter: blur(120px);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: -1;
+        }
+        .glow-blue {
+            position: absolute;
+            bottom: -10%; right: -10%;
+            width: 50vw; height: 50vw;
+            background: rgba(59, 130, 246, 0.2);
+            filter: blur(120px);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        /* Siri/Gemini Orb Animation */
+        .orb-container {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto;
+        }
+
+        .orb-core {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), rgba(147, 51, 234, 0.6) 40%, rgba(59, 130, 246, 0.4) 80%);
+            box-shadow: 0 0 40px rgba(147, 51, 234, 0.5), inset 0 0 20px rgba(255,255,255,0.4);
+            position: relative;
+            z-index: 10;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .orb-ring {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background: conic-gradient(from 0deg, rgba(236, 72, 153, 0), rgba(147, 51, 234, 0.5), rgba(59, 130, 246, 0.8), rgba(236, 72, 153, 0));
+            filter: blur(8px);
+            opacity: 0.6;
+            z-index: 5;
+            transition: all 0.3s ease;
+        }
+
+        .orb-idle .orb-core {
+            animation: float 4s ease-in-out infinite;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+        }
+
+        .orb-listening .orb-core {
+            animation: pulse-core 1.5s ease-in-out infinite alternate;
+            box-shadow: 0 0 60px rgba(236, 72, 153, 0.8), inset 0 0 30px rgba(255,255,255,0.6);
+            transform: scale(1.1);
+        }
+
+        .orb-listening .orb-ring {
+            animation: spin 3s linear infinite, pulse-ring 1.5s ease-in-out infinite alternate;
+            width: 130px;
+            height: 130px;
+            opacity: 1;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-10px) scale(0.98); }
+        }
+        @keyframes spin {
+            100% { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        @keyframes pulse-core {
+            0% { transform: scale(1); filter: brightness(1); }
+            100% { transform: scale(1.15); filter: brightness(1.3); }
+        }
+        @keyframes pulse-ring {
+            0% { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
+            100% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; filter: blur(12px); }
+        }
+
+        .tab-btn.active {
+            border-bottom: 2px solid #a855f7;
+            color: white;
+            font-weight: 500;
+        }
+        .tab-btn {
+            color: #9ca3af;
+            font-weight: 400;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        /* Custom Input Styling */
+        input {
+            background: rgba(0, 0, 0, 0.2) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            color: white !important;
+            transition: border-color 0.2s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #a855f7 !important;
+            box-shadow: 0 0 0 1px #a855f7 !important;
+        }
+    </style>
+</head>
+<body class="min-h-screen relative flex items-center justify-center p-4">
+
+    <!-- Background Glows -->
+    <div class="glow-purple"></div>
+    <div class="glow-blue"></div>
+
+    <div class="w-full max-w-md">
+        
+        <!-- Voice Agent Visual -->
+        <div class="text-center mb-8">
+            <div id="orb" class="orb-container orb-listening mb-4 cursor-pointer" onclick="toggleListening()">
+                <div class="orb-ring"></div>
+                <div class="orb-core"></div>
+            </div>
+            <h1 class="text-3xl font-light tracking-wide bg-gradient-to-r from-blue-400 to-fuchsia-400 text-transparent bg-clip-text">VoiceMail AI</h1>
+            <p id="listen-status" class="text-gray-400 mt-2 text-sm">Listening... Say <span class="text-white font-medium">"Sign in"</span>, <span class="text-white font-medium">"Sign up"</span>, or <span class="text-white font-medium">"Google"</span></p>
+        </div>
+
+        <div class="glass-card rounded-2xl p-8" id="auth-panel">
+            
+            <!-- Tabs -->
+            <div class="flex mb-6 border-b border-white/10">
+                <button onclick="switchTab('signin')" id="tab-signin" class="tab-btn active w-1/2 py-3 text-center">Sign In</button>
+                <button onclick="switchTab('signup')" id="tab-signup" class="tab-btn w-1/2 py-3 text-center">Sign Up</button>
+            </div>
+
+            <!-- Error Notification -->
+            <div id="error-msg" class="hidden mb-4 bg-red-500/20 border border-red-500/50 text-red-200 text-sm px-4 py-3 rounded-lg text-center"></div>
+
+            <!-- Sign In Form -->
+            <form id="form-signin" class="space-y-4" onsubmit="handleLogin(event)">
+                <div>
+                    <label class="block text-xs uppercase text-gray-400 mb-1">Email Address</label>
+                    <input type="email" id="login-email" required class="w-full rounded-lg px-4 py-3 text-sm placeholder-gray-500" placeholder="hello@example.com">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase text-gray-400 mb-1">Password</label>
+                    <input type="password" id="login-password" required class="w-full rounded-lg px-4 py-3 text-sm placeholder-gray-500" placeholder="••••••••">
+                </div>
+                <button type="submit" class="w-full py-3.5 mt-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:opacity-90 rounded-xl font-medium transition-opacity">
+                    Sign In Securly
+                </button>
+            </form>
+
+            <!-- Sign Up Form (Hidden initially) -->
+            <form id="form-signup" class="space-y-4 hidden" onsubmit="handleSignup(event)">
+                <div>
+                    <label class="block text-xs uppercase text-gray-400 mb-1">Full Name</label>
+                    <input type="text" id="signup-name" required class="w-full rounded-lg px-4 py-3 text-sm placeholder-gray-500" placeholder="John Doe">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase text-gray-400 mb-1">Email Address</label>
+                    <input type="email" id="signup-email" required class="w-full rounded-lg px-4 py-3 text-sm placeholder-gray-500" placeholder="hello@example.com">
+                </div>
+                <div>
+                    <label class="block text-xs uppercase text-gray-400 mb-1">Password</label>
+                    <input type="password" id="signup-password" required class="w-full rounded-lg px-4 py-3 text-sm placeholder-gray-500" placeholder="••••••••">
+                </div>
+                <button type="submit" class="w-full py-3.5 mt-2 bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:opacity-90 rounded-xl font-medium transition-opacity">
+                    Create Account
+                </button>
+            </form>
+
+            <div class="relative my-8">
+                <div class="absolute inset-0 flex items-center">
+                    <div class="w-full border-t border-white/10"></div>
+                </div>
+                <div class="relative flex justify-center text-sm">
+                    <span class="px-3 bg-transparent text-gray-500 drop-shadow-md">Or continue with</span>
+                </div>
+            </div>
+
+            <!-- Google Sign In -->
+            <button onclick="window.location.href='/login/oauth'" class="w-full py-3.5 bg-white text-gray-900 hover:bg-gray-100 rounded-xl font-medium transition-colors flex items-center justify-center gap-3">
+                <svg viewBox="0 0 24 24" class="w-5 h-5" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+                Sign in with Google
+            </button>
+            <p class="text-center text-gray-500 text-xs mt-4">Manual accounts do not sync with Gmail actions. For email dispatch capabilities, use Google Auth.</p>
+        </div>
+    </div>
+
+    <!-- Application Logic -->
+    <script>
+        // Tab switching logic
+        function switchTab(tab) {
+            document.getElementById('form-signin').classList.add('hidden');
+            document.getElementById('form-signup').classList.add('hidden');
+            document.getElementById('tab-signin').classList.remove('active');
+            document.getElementById('tab-signup').classList.remove('active');
+
+            if (tab === 'signin') {
+                document.getElementById('form-signin').classList.remove('hidden');
+                document.getElementById('tab-signin').classList.add('active');
+            } else {
+                document.getElementById('form-signup').classList.remove('hidden');
+                document.getElementById('tab-signup').classList.add('active');
+            }
+            document.getElementById('error-msg').classList.add('hidden');
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('error-msg');
+            el.innerText = msg;
+            el.classList.remove('hidden');
+        }
+
+        // Manual Authentication Handlers
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            try {
+                const res = await fetch('/api/auth/manual/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                if(res.ok) window.location.href = '/dashboard';
+                else showError("Invalid credentials");
+            } catch (err) {
+                showError("Server error.");
+            }
+        }
+
+        async function handleSignup(e) {
+            e.preventDefault();
+            const name = document.getElementById('signup-name').value;
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            try {
+                const res = await fetch('/api/auth/manual/signup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, password })
+                });
+                if(res.ok) {
+                    switchTab('signin');
+                    showError("Account created! Please sign in.");
+                    document.getElementById('error-msg').classList.replace('text-red-200', 'text-green-200');
+                    document.getElementById('error-msg').classList.replace('bg-red-500/20', 'bg-green-500/20');
+                    document.getElementById('error-msg').classList.replace('border-red-500/50', 'border-green-500/50');
+                } else {
+                    showError("Email already exists.");
+                }
+            } catch (err) {
+                showError("Server error.");
+            }
+        }
+
+        // --- INTELLIGENT VOICE LAYER ---
+        const orb = document.getElementById('orb');
+        const statusText = document.getElementById('listen-status');
+        let recognition = null;
+        let isListening = true;
+
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+                console.log("Voice Input Received:", transcript);
+                
+                if (transcript.includes('sign in') || transcript.includes('login')) {
+                    switchTab('signin');
+                    document.getElementById('login-email').focus();
+                    orbTriggerPulse();
+                } else if (transcript.includes('sign up') || transcript.includes('register')) {
+                    switchTab('signup');
+                    document.getElementById('signup-name').focus();
+                    orbTriggerPulse();
+                } else if (transcript.includes('google') || transcript.includes('auth')) {
+                    statusText.innerText = "Redirecting to Google...";
+                    orbTriggerPulse();
+                    window.location.href = '/login/oauth';
+                }
+            };
+
+            recognition.onerror = (e) => {
+                // Ignore background noise errors, just restart
+            };
+
+            recognition.onend = () => {
+                if (isListening) {
+                    try { recognition.start(); } catch(e){}
+                }
+            };
+
+            // Start automatically
+            try { recognition.start(); } catch(e){}
+
+        } else {
+            statusText.innerText = "Dictation not supported in this browser.";
+            orb.classList.remove('orb-listening');
+            orb.classList.add('orb-idle');
+        }
+
+        function toggleListening() {
+            isListening = !isListening;
+            if(isListening) {
+                orb.classList.remove('orb-idle');
+                orb.classList.add('orb-listening');
+                statusText.innerHTML = 'Listening... Say <span class="text-white font-medium">"Sign in"</span>, <span class="text-white font-medium">"Sign up"</span>, or <span class="text-white font-medium">"Google"</span>';
+                try { recognition.start(); } catch(e){}
+            } else {
+                orb.classList.remove('orb-listening');
+                orb.classList.add('orb-idle');
+                statusText.innerText = 'Microphone paused. Tap to resume.';
+                try { recognition.stop(); } catch(e){}
+            }
+        }
+
+        function orbTriggerPulse() {
+            orb.style.transform = "scale(1.2)";
+            setTimeout(() => { orb.style.transform = "scale(1)"; }, 300);
+        }
+    </script>
+</body>
+</html>

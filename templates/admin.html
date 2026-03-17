@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoiceMail AI - Admin Security</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0b0f19; color: white; min-height: 100vh; overflow-x: hidden; }
+        .glass-card { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); }
+        .glow-purple { position: absolute; top: -10%; left: -10%; width: 40vw; height: 40vw; background: rgba(147, 51, 234, 0.15); filter: blur(120px); border-radius: 50%; z-index: -1; pointer-events: none;}
+        .glow-blue { position: absolute; bottom: -10%; right: -10%; width: 40vw; height: 40vw; background: rgba(59, 130, 246, 0.15); filter: blur(120px); border-radius: 50%; z-index: -1; pointer-events: none;}
+    </style>
+</head>
+<body class="relative flex flex-col p-8 items-center">
+    <div class="glow-purple"></div>
+    <div class="glow-blue"></div>
+
+    <div class="w-full max-w-5xl z-10">
+        <a href="/dashboard" class="inline-flex items-center text-white/50 hover:text-white mb-8 transition-colors">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            Back to Dashboard
+        </a>
+        
+        <div class="flex items-center justify-between mb-10 border-b border-white/10 pb-6">
+            <div class="flex items-center gap-4">
+                <div class="p-3 bg-white/10 rounded-xl">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.95 11.95 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                </div>
+                <div>
+                    <h2 class="text-3xl font-light">Admin Console</h2>
+                    <p class="text-white/50 text-sm mt-1">Platform monitoring and analytics</p>
+                </div>
+            </div>
+            <div id="system-status" class="hidden sm:block">
+                <p class="text-xs uppercase tracking-wider text-green-400 font-medium flex items-center gap-2 justify-end">
+                    <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                    System Healthy
+                </p>
+            </div>
+        </div>
+
+        <div id="loading" class="animate-pulse space-y-4">
+            <div class="h-32 bg-white/5 rounded-2xl w-full"></div>
+            <div class="h-64 bg-white/5 rounded-2xl w-full"></div>
+        </div>
+
+        <div id="error" class="hidden glass-card p-10 mt-10 text-center border-red-500/20 max-w-lg mx-auto">
+            <h2 class="text-2xl font-medium text-white mb-2">Restricted Access</h2>
+            <p id="error-msg" class="text-white/60 mb-6"></p>
+        </div>
+
+        <div id="content" class="hidden">
+            <!-- Metrics Section -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                <div class="glass-card p-6 flex items-center justify-between">
+                    <div>
+                        <p class="text-white/50 text-sm font-medium uppercase tracking-wider mb-1">Total Users</p>
+                        <h3 id="stat-users" class="text-4xl font-light">0</h3>
+                    </div>
+                    <div class="p-4 bg-purple-500/10 rounded-full text-purple-400">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    </div>
+                </div>
+                <div class="glass-card p-6 flex items-center justify-between">
+                    <div>
+                        <p class="text-white/50 text-sm font-medium uppercase tracking-wider mb-1">Total Emails & Msgs Sent</p>
+                        <h3 id="stat-emails" class="text-4xl font-light">0</h3>
+                    </div>
+                    <div class="p-4 bg-blue-500/10 rounded-full text-blue-400">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                    </div>
+                </div>
+            </div>
+            <div class="glass-card overflow-hidden mb-10">
+                <div class="p-6 border-b border-white/10 bg-white/5 flex justify-between items-center">
+                    <h3 class="font-medium text-lg">Manage System Users</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-white/5 text-white/50 text-xs uppercase tracking-wider">
+                                <th class="p-4 px-6 font-medium">Name</th>
+                                <th class="p-4 px-6 font-medium">Email</th>
+                                <th class="p-4 px-6 font-medium text-center">Provider</th>
+                                <th class="p-4 px-6 font-medium text-center">Status</th>
+                                <th class="p-4 px-6 font-medium text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-list" class="divide-y divide-white/5">
+                            <!-- Users will be populated here -->
+                        </tbody>
+                    </table>
+                    <p id="users-empty" class="hidden p-8 text-center text-white/40 italic">No users found.</p>
+                </div>
+            </div>
+
+            <div class="glass-card overflow-hidden">
+                <div class="p-6 border-b border-white/10 bg-white/5">
+                    <h3 class="font-medium text-lg">System Activity Log</h3>
+                </div>
+                <div>
+                    <ul id="activity-list" class="divide-y divide-white/5">
+                    </ul>
+                    <p id="activity-empty" class="hidden p-8 text-center text-white/40 italic">No activity recorded yet.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function fetchMetrics() {
+            try {
+                const res = await fetch('/api/admin/metrics');
+                const data = await res.json();
+                
+                document.getElementById('loading').classList.add('hidden');
+                
+                if(!res.ok || data.error) {
+                    document.getElementById('error').classList.remove('hidden');
+                    document.getElementById('error-msg').innerText = data.error || "Requires Developer Admin Account login via Google.";
+                    document.getElementById('system-status').classList.add('hidden');
+                    return;
+                }
+                
+                document.getElementById('content').classList.remove('hidden');
+                
+                document.getElementById('stat-users').innerText = data.total_users || 0;
+                document.getElementById('stat-emails').innerText = data.total_emails_sent || 0;
+                
+                const list = document.getElementById('activity-list');
+                const logs = data.recent_activity || [];
+                if(logs.length > 0) {
+                    let html = '';
+                    logs.forEach((log, i) => {
+                        html += `<li class="p-4 px-6 text-white/80 text-sm font-mono flex items-center justify-between hover:bg-white/5 transition-colors gap-4">
+                                    <div class="flex items-start gap-4 flex-1">
+                                        <span class="text-white/30 text-xs shrink-0 w-6 text-right">${i+1}.</span>
+                                        <span>${log.message}</span>
+                                    </div>
+                                    <span class="px-2 py-1 bg-white/5 text-white/40 rounded text-[10px] uppercase tracking-wider shrink-0">${log.user}</span>
+                                </li>`;
+                    });
+                    list.innerHTML = html;
+                } else {
+                    document.getElementById('activity-empty').classList.remove('hidden');
+                }
+                
+                fetchUsers();
+                
+            } catch(e) {
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('error').classList.remove('hidden');
+                document.getElementById('error-msg').innerText = "Developer Error: Unreachable Backend API.";
+            }
+        }
+
+        async function fetchUsers() {
+            try {
+                const res = await fetch('/api/admin/users');
+                const data = await res.json();
+                if(data.users) {
+                    const list = document.getElementById('users-list');
+                    if(data.users.length > 0) {
+                        let html = '';
+                        data.users.forEach(u => {
+                            const isGoogle = u.auth_provider === 'google';
+                            const providerBadge = isGoogle 
+                                ? `<span class="px-2 py-1 bg-red-500/10 text-red-400 rounded-lg text-xs font-medium">Google</span>`
+                                : `<span class="px-2 py-1 bg-blue-500/10 text-blue-400 rounded-lg text-xs font-medium">Manual</span>`;
+                                
+                            const statusBadge = u.is_blocked 
+                                ? `<span class="px-2 py-1 bg-gray-500/20 text-gray-400 rounded-lg text-xs font-medium border border-gray-500/30">Blocked</span>`
+                                : `<span class="px-2 py-1 bg-green-500/10 text-green-400 rounded-lg text-xs font-medium border border-green-500/20">Active</span>`;
+                                
+                            const blockBtn = u.is_blocked
+                                ? `<button onclick="blockUser('${u.email}', false)" class="text-xs px-3 py-1 bg-green-500/10 text-green-400 hover:bg-green-500/20 rounded transition-colors">Unblock</button>`
+                                : `<button onclick="blockUser('${u.email}', true)" class="text-xs px-3 py-1 bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 rounded transition-colors">Block</button>`;
+
+                            html += `
+                                <tr class="hover:bg-white/5 transition-colors group">
+                                    <td class="p-4 px-6"><input type="text" id="name-${u.email}" value="${u.name}" class="bg-transparent border-b border-transparent focus:border-purple-500 outline-none w-full text-white"></td>
+                                    <td class="p-4 px-6"><input type="email" id="email-${u.email}" value="${u.email}" class="bg-transparent border-b border-transparent focus:border-purple-500 outline-none w-full text-white/80"></td>
+                                    <td class="p-4 px-6 text-center">${providerBadge}</td>
+                                    <td class="p-4 px-6 text-center">${statusBadge}</td>
+                                    <td class="p-4 px-6 text-right space-x-2 bg-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onclick="updateUser('${u.email}')" class="text-xs px-3 py-1 bg-white/10 hover:bg-white/20 rounded transition-colors">Save</button>
+                                        ${blockBtn}
+                                        <button onclick="deleteUser('${u.email}')" class="text-xs px-3 py-1 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded transition-colors">Delete</button>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+                        list.innerHTML = html;
+                        document.getElementById('users-empty').classList.add('hidden');
+                    } else {
+                        document.getElementById('users-empty').classList.remove('hidden');
+                    }
+                }
+            } catch(e) {
+                console.error("Failed to fetch users", e);
+            }
+        }
+
+        async function deleteUser(email) {
+            if(!confirm(`Delete user ${email}?`)) return;
+            try {
+                const res = await fetch('/api/admin/users/delete', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email})
+                });
+                if(res.ok) fetchUsers();
+            } catch(e) {
+                alert("Failed to delete user");
+            }
+        }
+
+        async function blockUser(email, blockStatus) {
+            const action = blockStatus ? "Block" : "Unblock";
+            if(!confirm(`${action} user ${email}?`)) return;
+            try {
+                const res = await fetch('/api/admin/users/block', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email: email, block: blockStatus})
+                });
+                if(res.ok) fetchUsers();
+            } catch(e) {
+                alert(`Failed to ${action.toLowerCase()} user`);
+            }
+        }
+
+        async function updateUser(currentEmail) {
+            const newName = document.getElementById(`name-${currentEmail}`).value;
+            const newEmail = document.getElementById(`email-${currentEmail}`).value;
+            try {
+                const res = await fetch('/api/admin/users/update', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({current_email: currentEmail, name: newName, email: newEmail})
+                });
+                if(res.ok) {
+                    fetchUsers();
+                    alert("User updated successfully");
+                } else {
+                    alert("Update failed");
+                }
+            } catch(e) {
+                alert("Failed to update user");
+            }
+        }
+
+        fetchMetrics();
+    </script>
+</body>
+</html>

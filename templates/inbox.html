@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VoiceMail AI - Inbox</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0b0f19; color: white; min-height: 100vh; overflow-x: hidden; }
+        .glass-panel { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); }
+        .glow-purple { position: absolute; top: -10%; left: -10%; width: 40vw; height: 40vw; background: rgba(147, 51, 234, 0.15); filter: blur(120px); border-radius: 50%; z-index: -1; pointer-events: none;}
+        .glow-blue { position: absolute; bottom: -10%; right: -10%; width: 40vw; height: 40vw; background: rgba(59, 130, 246, 0.15); filter: blur(120px); border-radius: 50%; z-index: -1; pointer-events: none;}
+    </style>
+</head>
+<body class="relative flex flex-col p-8 items-center">
+    <div class="glow-purple"></div>
+    <div class="glow-blue"></div>
+
+    <div class="w-full max-w-4xl z-10">
+        <div class="flex justify-between items-center mb-8">
+            <a href="/dashboard" class="inline-flex items-center text-white/50 hover:text-white transition-colors">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                Back to Dashboard
+            </a>
+            <a href="/logout" class="text-white/40 hover:text-white text-sm transition-colors">Log out</a>
+        </div>
+        
+        <div class="flex items-center gap-4 mb-10">
+            <div class="p-3 bg-fuchsia-500/20 rounded-xl">
+                <svg class="w-8 h-8 text-fuchsia-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+            </div>
+            <div>
+                <h2 class="text-3xl font-light">Recent Inbox</h2>
+                <p class="text-white/50 text-sm mt-1">Showing latest 10 messages</p>
+            </div>
+        </div>
+
+        <div id="loading" class="space-y-4">
+            <div class="h-24 bg-white/5 animate-pulse rounded-2xl w-full"></div>
+            <div class="h-24 bg-white/5 animate-pulse rounded-2xl w-full"></div>
+            <div class="h-24 bg-white/5 animate-pulse rounded-2xl w-full"></div>
+        </div>
+
+        <div id="error" class="hidden glass-panel p-6 border-red-500/30 bg-red-500/10 text-red-200 rounded-xl mb-4"></div>
+        
+        <div id="empty" class="hidden text-center py-20 text-white/40">
+            <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+            <p class="text-lg">No emails found or API disconnected.</p>
+        </div>
+
+        <div id="content" class="space-y-4 hidden">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+
+    <script>
+        async function fetchInbox() {
+            try {
+                const res = await fetch('/api/inbox');
+                if(!res.ok) throw new Error("Need Google Auth to view inbox.");
+                const data = await res.json();
+                
+                document.getElementById('loading').classList.add('hidden');
+                
+                if(!data.emails || data.emails.length === 0) {
+                    document.getElementById('empty').classList.remove('hidden');
+                    return;
+                }
+                
+                document.getElementById('content').classList.remove('hidden');
+                
+                let html = '';
+                data.emails.forEach(email => {
+                    html += `
+                    <div class="glass-panel p-6 rounded-2xl hover:bg-white/10 transition-colors group">
+                        <h3 class="text-lg font-medium text-white mb-1 truncate">${email.sender.replace(/<.*>/, '')}</h3>
+                        <p class="text-white/70 font-light truncate">${email.subject || '(No Subject)'}</p>
+                    </div>`;
+                });
+                document.getElementById('content').innerHTML = html;
+
+            } catch(e) {
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('error').classList.remove('hidden');
+                document.getElementById('error').innerText = e.message;
+            }
+        }
+        fetchInbox();
+    </script>
+</body>
+</html>
