@@ -95,6 +95,13 @@ total_emails_sent = 0  # Fix: was missing, caused NameError crash in command_han
 
 user_pin = "1234"
 
+def get_tg_session_name():
+    """Generates a safe session name for Telegram per user."""
+    email = session.get('user_email', 'guest')
+    # Sanitize email to use as filename
+    safe_name = email.replace('@', '_at_').replace('.', '_')
+    return f"tg_session_{safe_name}"
+
 def get_activity_logs():
     conn = get_connection()
     c = conn.cursor()
@@ -196,17 +203,17 @@ telegram_login_state = {}
 @app.route("/api/telegram/status")
 def telegram_status():
     from modules.telegram_service import is_telegram_authorized
-    return jsonify({"connected": is_telegram_authorized()})
+    return jsonify({"connected": is_telegram_authorized(get_tg_session_name())})
 
 @app.route("/api/telegram/send_code", methods=["POST"])
 def telegram_send_code_route():
     data = request.json
     phone = data.get("phone")
     from modules.telegram_service import telegram_send_code
-    res = telegram_send_code(phone)
+    res = telegram_send_code(phone, get_tg_session_name())
     if res.get("success"):
-        telegram_login_state["phone"] = phone
-        telegram_login_state["phone_code_hash"] = res.get("phone_code_hash")
+        session["tg_phone"] = phone
+        session["tg_phone_code_hash"] = res.get("phone_code_hash")
         return jsonify({"success": True})
     return jsonify({"success": False, "error": res.get("error")})
 
@@ -214,16 +221,17 @@ def telegram_send_code_route():
 def telegram_verify_code_route():
     data = request.json
     code = data.get("code")
-    phone = telegram_login_state.get("phone")
-    phone_code_hash = telegram_login_state.get("phone_code_hash")
+    phone = session.get("tg_phone")
+    phone_code_hash = session.get("tg_phone_code_hash")
     
     if not phone or not phone_code_hash:
         return jsonify({"success": False, "error": "Session expired, please request code again."})
         
     from modules.telegram_service import telegram_verify_code
-    res = telegram_verify_code(phone, code, phone_code_hash)
+    res = telegram_verify_code(phone, code, phone_code_hash, get_tg_session_name())
     if res.get("success"):
-        telegram_login_state.clear()
+        session.pop("tg_phone", None)
+        session.pop("tg_phone_code_hash", None)
         return jsonify({"success": True})
     elif res.get("needs_password"):
         return jsonify({"success": False, "needs_password": True})
@@ -235,9 +243,10 @@ def telegram_verify_password_route():
     password = data.get("password")
     
     from modules.telegram_service import telegram_verify_password
-    res = telegram_verify_password(password)
+    res = telegram_verify_password(password, get_tg_session_name())
     if res.get("success"):
-        telegram_login_state.clear()
+        session.pop("tg_phone", None)
+        session.pop("tg_phone_code_hash", None)
         return jsonify({"success": True})
     return jsonify({"success": False, "error": res.get("error")})
 
@@ -903,7 +912,7 @@ def command_handler():
         if entered_pin == user_pin:
             msg = telegram_state.get("pending_message", "")
             uname = telegram_state.get("username", "")
-            response = send_telegram_message(uname, msg)
+            response = send_telegram_message(uname, msg, get_tg_session_name())
             telegram_state = {}
             add_log("Telegram message sent.")
             return jsonify({"response": speak_response("Telegram message sent.", language), "language": language})
@@ -912,6 +921,21 @@ def command_handler():
             add_log("Failed PIN for Telegram.")
             return jsonify({"response": speak_response("Invalid PIN. Message not sent.", language), "language": language})
 
+    # ── SUMMARIZE & SUGGEST (AI Features) ──────────────────────────────────
+    if "summarize telegram" in command or "telegram summary" in command:
+        msg = read_latest_telegram(get_tg_session_name())
+        if not msg or msg in ["NOT_CONNECTED", "NO_MESSAGES", "ERROR"]:
+            return jsonify({"response": speak_response("No Telegram messages found to summarize.", language), "language": language})
+        summary = summarize_text(msg)
+        return jsonify({"response": speak_response(f"Latest Telegram message summary: {summary}", language), "language": language})
+
+    if "suggest telegram reply" in command or "telegram reply suggestion" in command:
+        msg = read_latest_telegram(get_tg_session_name())
+        if not msg or msg in ["NOT_CONNECTED", "NO_MESSAGES", "ERROR"]:
+            return jsonify({"response": speak_response("No Telegram messages found to suggest a reply.", language), "language": language})
+        suggestion = suggest_reply(msg)
+        return jsonify({"response": speak_response(f"I suggest this reply: {suggestion}", language), "language": language})
+
     # ── SEND TELEGRAM: Initiate guided flow ───────────────────────────────
     if "send telegram" in command:
         telegram_state = {"step": "recipient"}
@@ -919,11 +943,17 @@ def command_handler():
             "Which contact should I send Telegram to?", language), "language": language})
 
     # ── READ TELEGRAM ─────────────────────────────────────────────────────
-    if "read telegram" in command:
-        msg = read_latest_telegram()
-        if msg:
+    if "read telegram" in command or "check telegram" in command:
+        msg = read_latest_telegram(get_tg_session_name())
+        if msg == "NOT_CONNECTED":
+            return jsonify({"response": speak_response("Telegram is not connected.", language), "language": language})
+        elif msg == "NO_MESSAGES":
+            return jsonify({"response": speak_response("No Telegram messages found in your recent chats.", language), "language": language})
+        elif msg == "ERROR":
+            return jsonify({"response": speak_response("Telegram read error. Please reconnect.", language), "language": language})
+        elif msg:
             return jsonify({"response": msg, "language": language})
-        return jsonify({"response": "No Telegram messages found or not connected.", "language": language})
+        return jsonify({"response": speak_response("No messages found.", language), "language": language})
 
     # ── FALLBACK ──────────────────────────────────────────────────────────
     return jsonify({"response": "Command not understood", "language": language})

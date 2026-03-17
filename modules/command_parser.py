@@ -65,7 +65,7 @@ COMMAND_MAP = {
     # SUGGEST TELEGRAM REPLY
     "suggest telegram reply": [
         "suggest telegram reply", "telegram reply suggestion",
-        "टेलीग्राम जवाब सुझाओ"
+        "टेलीग्राम जवाब सुझाव", "टेलीग्राम जवाब दो"
     ],
 
     # ADD CONTACT
