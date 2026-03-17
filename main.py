@@ -452,6 +452,16 @@ def logout():
     service = None
     session.clear()          # ← clears 'logged_in', 'auth_type', etc.
     add_log("User logged out.")
+    import os
+    import glob
+    # Clean up Gmail token
+    if os.path.exists("token.pickle"):
+        try: os.remove("token.pickle")
+        except: pass
+    # Clean up Telegram sessions
+    for f in glob.glob("*.session"):
+        try: os.remove(f)
+        except: pass
     return redirect("/")
 
 @app.route("/api/contacts", methods=["GET"])
@@ -686,7 +696,7 @@ def command_handler():
         return jsonify({"response": confirm_text, "language": language})
 
     if email_state.get("step") == "confirm":
-        if any(word in command for word in ["yes", "yeah", "confirm", "conform", "send", "okay", "ok", "sure", "haan", "हाँ", "हां", "ha"]):
+        if any(word in command for word in ["yes", "yeah", "confirm", "conform", "send", "okay", "ok", "sure", "haan", "हाँ", "हां", "ha","हाँ" , "हां", "ओके", "बिलकुल"]):
             email_state["step"] = "pin_auth"
             return jsonify({"response": speak_response("Please say your 4-digit PIN", language), "language": language})
         else:
@@ -724,7 +734,7 @@ def command_handler():
 
         if any(word in command for word in [
             "yes", "yeah", "confirm", "conform",
-            "send", "okay", "ok", "sure"
+            "send", "okay", "ok", "sure","हाँ" , "हां", "ओके", "बिलकुल"
         ]):
             reply_state["step"] = "latest_pin_auth"
             return jsonify({"response": translate_text("Please say your 4-digit PIN", language), "language": language})
@@ -760,7 +770,7 @@ def command_handler():
 
         if any(word in command for word in [
             "yes", "yeah", "confirm", "conform",
-            "send", "okay", "ok", "sure"
+            "send", "okay", "ok", "sure","हाँ" , "हां", "ओके", "बिलकुल"
         ]):
             reply_state["step"] = "contact_pin_auth"
             return jsonify({"response": translate_text("Please say your 4-digit PIN", language), "language": language})
@@ -855,7 +865,7 @@ def command_handler():
         return jsonify({"response": speak_response("What message should I send?", language), "language": language})
 
     if telegram_state.get("step") == "ask_save_contact":
-        if any(w in command for w in ["yes", "haan", "ok", "sure", "हाँ", "ha", "yeah"]):
+        if any(w in command for w in ["yes", "haan", "ok", "sure", "हाँ", "ha", "yeah","हाँ" , "हां", "ओके", "बिलकुल"]):
             telegram_state["step"] = "save_contact_name"
             return jsonify({"response": speak_response("What should I name this contact?", language), "language": language})
         else:
@@ -880,7 +890,7 @@ def command_handler():
         return jsonify({"response": f"Sending to {uname}: '{command}'. Say yes to confirm.", "language": language})
 
     if telegram_state.get("step") == "confirm":
-        if any(w in command for w in ["yes", "haan", "ok", "confirm", "sure", "हाँ"]):
+        if any(w in command for w in ["yes", "haan", "ok", "confirm", "sure", "हाँ" , "हां", "ओके", "बिलकुल"]):
             telegram_state["step"] = "pin_auth"
             telegram_state["timestamp"] = time_module.time()
             return jsonify({"response": speak_response("Please say your 4-digit PIN", language), "language": language})
@@ -919,6 +929,25 @@ def command_handler():
     return jsonify({"response": "Command not understood", "language": language})
 
 
+import atexit
+def cleanup_token():
+    import os
+    import glob
+    if os.path.exists("token.pickle"):
+        try:
+            os.remove("token.pickle")
+            print("Cleaned up token.pickle")
+        except:
+            pass
+    
+    for f in glob.glob("*.session"):
+        try:
+            os.remove(f)
+            print(f"Cleaned up {f}")
+        except:
+            pass
+
+atexit.register(cleanup_token)
 
 if __name__ == "__main__":
     print("Starting Flask server...")
