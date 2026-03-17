@@ -10,12 +10,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 # Add newly added deps directly since user requested missing ones appended
 RUN pip install --no-cache-dir flask-cors telethon
-
+RUN pip install gunicorn
 # Copy all project files
 COPY . .
 
-# Expose port for Flask
-EXPOSE 5000
 
 # Command to run the application using gunicorn for better production performance
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "8", "--timeout", "0", "main:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "--workers", "1", "--threads", "8", "--timeout", "0", "main:app"]
