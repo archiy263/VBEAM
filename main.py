@@ -142,7 +142,8 @@ def auth_status():
             return jsonify({"authenticated": False})
     return jsonify({"authenticated": False})
 
-from modules import gmail_auth
+from modules import gmail_auth 
+import traceback
 @app.route("/login/oauth")
 def oauth_login():
     global service
@@ -194,11 +195,12 @@ def oauth2callback():
         session['user_email'] = email
 
         return redirect("/dashboard")
-
+    
     except Exception as e:
         print("OAuth Error:", e)
+        traceback.print_exc()
         service = None
-        return redirect("/")    
+        return "OAuth Failed - Check Logs"    
 
 @app.route("/api/auth/manual/signup", methods=["POST"])
 def manual_signup():
