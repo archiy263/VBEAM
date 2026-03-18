@@ -146,7 +146,6 @@ from modules import gmail_auth
 import traceback
 @app.route("/login/oauth")
 def oauth_login():
-    global service
     return gmail_auth.login()
         
     # try:

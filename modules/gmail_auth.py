@@ -1,63 +1,47 @@
-import pickle
 import os
-from google_auth_oauthlib.flow import InstalledAppFlow
+from flask import redirect, request
+from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 
+import os
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+CLIENT_SECRETS_FILE = os.getenv(
+    "GOOGLE_CREDENTIALS_PATH",
+    "credentials.json"
+)
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
-def login():
 
-    creds = None
-
-    if os.path.exists("token.pickle"):
-
-        with open("token.pickle", "rb") as token:
-
-            creds = pickle.load(token)
-
-    else:
-
-        from google_auth_oauthlib.flow import Flow
-        from flask import redirect, request
-
-    CLIENT_SECRETS_FILE = "/etc/secrets/credentials.json"
-    SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
-
-    def get_flow():
-        return Flow.from_client_secrets_file(
-        CLIENT_SECRETS_FILE,
-        scopes=SCOPES,
-        redirect_uri="https://vbeam-1.onrender.com/oauth2callback"
+def get_flow():
+    # 🔥 auto switch between local and production
+    redirect_uri = os.getenv(
+        "REDIRECT_URI",
+        "http://localhost:5000/oauth2callback"
     )
 
-    def login():
-        flow = get_flow()
+    return Flow.from_client_secrets_file(
+        CLIENT_SECRETS_FILE,
+        scopes=SCOPES,
+        redirect_uri=redirect_uri
+    )
 
-        auth_url, _ = flow.authorization_url(
-            access_type='offline',
-            include_granted_scopes='true'
-        )
+# STEP 1 → redirect to Google login
+def login():
+    flow = get_flow()
 
-        return redirect(auth_url)
-    def oauth2callback():
-        flow = get_flow()
-        flow.fetch_token(authorization_response=request.url)
-        creds = flow.credentials
-        # You can store creds here if needed
-        return "Google Login Success ✅"    
+    auth_url, _ = flow.authorization_url(
+        access_type='offline',
+        include_granted_scopes='true'
+    )
 
+    return redirect(auth_url)
 
+# STEP 2 → Google callback → create Gmail service
+def oauth2callback():
+    flow = get_flow()
+    flow.fetch_token(authorization_response=request.url)
 
-        # flow = InstalledAppFlow.from_client_secrets_file(
-        #     "credentials.json", SCOPES
-        # )
+    creds = flow.credentials
 
-        # creds = flow.run_local_server(
-        #     port=0,
-        #     open_browser=True
-        # )
+    service = build("gmail", "v1", credentials=creds)
 
-        with open("token.pickle", "wb") as token:
-
-            pickle.dump(creds, token)
-
-    return build("gmail", "v1", credentials=creds)
+    return service
