@@ -11,8 +11,7 @@ CLIENT_SECRETS_FILE = os.getenv(
 )
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
 
-def get_flow():
-    # auto switch between local and production
+def get_flow(state=None):
     redirect_uri = os.getenv(
         "REDIRECT_URI",
         "http://localhost:5000/oauth2callback"
@@ -21,27 +20,32 @@ def get_flow():
     return Flow.from_client_secrets_file(
         CLIENT_SECRETS_FILE,
         scopes=SCOPES,
-        redirect_uri=redirect_uri
+        state=state,
+        redirect_uri=redirect_uri,
+        autogenerate_code_verifier=False
     )
-
 # redirect to Google login
+
 def login():
     flow = get_flow()
 
-    auth_url, _ = flow.authorization_url(
+    auth_url, state = flow.authorization_url(
         access_type='offline',
-        include_granted_scopes='true'
+        include_granted_scopes='true',
+        code_challenge_method=None
     )
+
+    session['oauth_state'] = state
 
     return redirect(auth_url)
 
-# STEP 2 → Google callback → create Gmail service
 def oauth2callback():
-    flow = get_flow()
+    state = session.get('oauth_state')
+
+    flow = get_flow(state=state)
+
     flow.fetch_token(authorization_response=request.url)
 
     creds = flow.credentials
 
-    service = build("gmail", "v1", credentials=creds)
-
-    return service
+    return build("gmail", "v1", credentials=creds)
