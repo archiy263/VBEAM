@@ -142,34 +142,63 @@ def auth_status():
             return jsonify({"authenticated": False})
     return jsonify({"authenticated": False})
 
-
+from modules import gmail_auth
 @app.route("/login/oauth")
 def oauth_login():
     global service
-    service = login()
-    if not service:
-        return redirect("/")
+    return gmail_auth.login()
         
+    # try:
+    #     profile = service.users().getProfile(userId="me").execute()
+    #     email = profile.get("emailAddress")
+    #     name = email.split("@")[0]
+        
+    #     from modules.auth import get_or_create_google_user
+    #     user = get_or_create_google_user(email, name)
+        
+    #     if user and "error" in user:
+    #         service = None
+    #         return render_template("login.html", error="Your account has been blocked by the admin.")
+    # except Exception as e:
+    #     service = None
+    #     return redirect("/")
+
+    # add_log("User logged in with Google Auth successfully.")
+    # session['logged_in'] = True
+    # session['auth_type'] = 'google'
+    # session['user_email'] = email
+    # return redirect("/dashboard")
+
+@app.route("/oauth2callback")
+def oauth2callback():
+    global service
+
     try:
+        service = gmail_auth.oauth2callback()
+
         profile = service.users().getProfile(userId="me").execute()
         email = profile.get("emailAddress")
         name = email.split("@")[0]
-        
+
         from modules.auth import get_or_create_google_user
         user = get_or_create_google_user(email, name)
-        
+
         if user and "error" in user:
             service = None
             return render_template("login.html", error="Your account has been blocked by the admin.")
-    except Exception as e:
-        service = None
-        return redirect("/")
 
-    add_log("User logged in with Google Auth successfully.")
-    session['logged_in'] = True
-    session['auth_type'] = 'google'
-    session['user_email'] = email
-    return redirect("/dashboard")
+        add_log("User logged in with Google Auth successfully.")
+
+        session['logged_in'] = True
+        session['auth_type'] = 'google'
+        session['user_email'] = email
+
+        return redirect("/dashboard")
+
+    except Exception as e:
+        print("OAuth Error:", e)
+        service = None
+        return redirect("/")    
 
 @app.route("/api/auth/manual/signup", methods=["POST"])
 def manual_signup():

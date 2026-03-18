@@ -16,14 +16,27 @@ def login():
 
     else:
 
-        flow = InstalledAppFlow.from_client_secrets_file(
-            "/etc/secrets/credentials.json", SCOPES
-        )
+        from google_auth_oauthlib.flow import Flow
+        from flask import redirect, request
 
-        creds = flow.run_local_server(
-            port=0,
-            open_browser=True
-        )
+    CLIENT_SECRETS_FILE = "/etc/secrets/credentials.json"
+    SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
+
+    def get_flow():
+        return Flow.from_client_secrets_file(
+        CLIENT_SECRETS_FILE,
+        scopes=SCOPES,
+        redirect_uri="https://vbeam-1.onrender.com/oauth2callback"
+    )
+
+        # flow = InstalledAppFlow.from_client_secrets_file(
+        #     "credentials.json", SCOPES
+        # )
+
+        # creds = flow.run_local_server(
+        #     port=0,
+        #     open_browser=True
+        # )
 
         with open("token.pickle", "wb") as token:
 
