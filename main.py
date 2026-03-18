@@ -16,7 +16,9 @@ from modules.database import get_connection
 app = Flask(__name__)
 # Enable CORS for React Dev Server
 CORS(app, supports_credentials=True)
+from werkzeug.middleware.proxy_fix import ProxyFix
 
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # ── Local translations (no Gemini API needed) ──────────────────────────────
 _TRANSLATIONS = {
@@ -84,7 +86,12 @@ def speak_response(text: str, language: str) -> str:
     return text
 
 
-app.secret_key = "voice_email_secret"
+app.secret_key = os.getenv("SECRET_KEY", "voice_email_secret")
+
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_SAMESITE="None"
+)
 
 
 service = None
