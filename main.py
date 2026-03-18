@@ -1,4 +1,3 @@
-
 from dotenv import load_dotenv
 import os
 load_dotenv()
@@ -155,27 +154,6 @@ import traceback
 def oauth_login():
     return gmail_auth.login()
         
-    # try:
-    #     profile = service.users().getProfile(userId="me").execute()
-    #     email = profile.get("emailAddress")
-    #     name = email.split("@")[0]
-        
-    #     from modules.auth import get_or_create_google_user
-    #     user = get_or_create_google_user(email, name)
-        
-    #     if user and "error" in user:
-    #         service = None
-    #         return render_template("login.html", error="Your account has been blocked by the admin.")
-    # except Exception as e:
-    #     service = None
-    #     return redirect("/")
-
-    # add_log("User logged in with Google Auth successfully.")
-    # session['logged_in'] = True
-    # session['auth_type'] = 'google'
-    # session['user_email'] = email
-    # return redirect("/dashboard")
-
 @app.route("/oauth2callback")
 def oauth2callback():
     global service
