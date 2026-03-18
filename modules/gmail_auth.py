@@ -29,6 +29,24 @@ def login():
         redirect_uri="https://vbeam-1.onrender.com/oauth2callback"
     )
 
+    def login():
+        flow = get_flow()
+
+        auth_url, _ = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true'
+        )
+
+        return redirect(auth_url)
+    def oauth2callback():
+        flow = get_flow()
+        flow.fetch_token(authorization_response=request.url)
+        creds = flow.credentials
+        # You can store creds here if needed
+        return "Google Login Success ✅"    
+
+
+
         # flow = InstalledAppFlow.from_client_secrets_file(
         #     "credentials.json", SCOPES
         # )
