@@ -45,9 +45,13 @@
                     <h3 id="user-name" class="text-2xl font-medium">Loading...</h3>
                     <p id="user-email" class="text-white/80">...</p>
                 </div>
-                <div class="ml-auto p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl text-center">
-                    <p class="text-purple-300 text-xs uppercase tracking-widest mb-1">Voice PIN</p>
-                    <p class="text-3xl font-mono text-white tracking-widest">1234</p>
+                <div class="ml-auto p-4 bg-purple-500/10 border border-purple-500/20 rounded-xl text-center flex flex-col items-center">
+                    <p class="text-purple-300 text-xs uppercase tracking-widest mb-2">Voice PIN</p>
+                    <div class="flex items-center gap-2">
+                        <input type="text" id="user-pin-input" maxlength="4" class="w-20 bg-black/30 text-white text-2xl font-mono text-center border border-purple-500/30 rounded-lg outline-none focus:border-purple-400 py-1" value="----">
+                        <button onclick="updatePin()" id="pin-btn" class="bg-purple-600 hover:bg-purple-500 text-white text-xs px-3 py-2 rounded-lg transition-colors font-medium">Save</button>
+                    </div>
+                    <p id="pin-msg" class="text-xs text-green-400 mt-2 hidden">PIN Updated!</p>
                 </div>
             </div>
 
@@ -73,6 +77,10 @@
                 
                 document.getElementById('user-name').innerText = data.name || "User";
                 document.getElementById('user-email').innerText = data.email || "Manual Active Session";
+                
+                if (data.pin) {
+                    document.getElementById('user-pin-input').value = data.pin;
+                }
 
                 const container = document.getElementById('contacts-container');
                 if(Object.keys(data.contacts || {}).length > 0) {
@@ -96,6 +104,44 @@
             }
         }
         fetchProfile();
+
+        async function updatePin() {
+            const newPin = document.getElementById('user-pin-input').value;
+            const btn = document.getElementById('pin-btn');
+            const msg = document.getElementById('pin-msg');
+            
+            if (newPin.length !== 4 || isNaN(newPin)) {
+                alert("PIN must be exactly 4 digits.");
+                return;
+            }
+            
+            btn.innerText = "Saving...";
+            try {
+                const res = await fetch('/api/profile/pin', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin: newPin })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    msg.classList.remove('hidden');
+                    msg.innerText = "PIN Updated!";
+                    msg.classList.remove('text-red-400');
+                    msg.classList.add('text-green-400');
+                    setTimeout(() => msg.classList.add('hidden'), 3000);
+                } else {
+                    throw new Error(data.error || "Failed to update PIN");
+                }
+            } catch(e) {
+                msg.classList.remove('hidden');
+                msg.innerText = e.message;
+                msg.classList.remove('text-green-400');
+                msg.classList.add('text-red-400');
+            } finally {
+                btn.innerText = "Save";
+            }
+        }
     </script>
 </body>
 </html>

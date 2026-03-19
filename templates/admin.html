@@ -53,7 +53,7 @@
 
         <div id="content" class="hidden">
             <!-- Metrics Section -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
                 <div class="glass-card p-6 flex items-center justify-between">
                     <div>
                         <p class="text-white/50 text-sm font-medium uppercase tracking-wider mb-1">Total Users</p>
@@ -63,9 +63,21 @@
                         <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                     </div>
                 </div>
+                <div class="glass-card p-6 flex items-center justify-between border border-green-500/30 bg-green-500/5">
+                    <div>
+                        <p class="text-green-400 text-sm font-medium uppercase tracking-wider mb-1 flex items-center gap-2">
+                            <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                            Live Online
+                        </p>
+                        <h3 id="stat-active" class="text-4xl font-light text-white">0</h3>
+                    </div>
+                    <div class="p-4 bg-green-500/10 rounded-full text-green-400">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                </div>
                 <div class="glass-card p-6 flex items-center justify-between">
                     <div>
-                        <p class="text-white/50 text-sm font-medium uppercase tracking-wider mb-1">Total Emails & Msgs Sent</p>
+                        <p class="text-white/50 text-sm font-medium uppercase tracking-wider mb-1">Msgs Sent</p>
                         <h3 id="stat-emails" class="text-4xl font-light">0</h3>
                     </div>
                     <div class="p-4 bg-blue-500/10 rounded-full text-blue-400">
@@ -127,6 +139,7 @@
                 document.getElementById('content').classList.remove('hidden');
                 
                 document.getElementById('stat-users').innerText = data.total_users || 0;
+                document.getElementById('stat-active').innerText = Array.isArray(data.active_users) ? data.active_users.length : 0;
                 document.getElementById('stat-emails').innerText = data.total_emails_sent || 0;
                 
                 const list = document.getElementById('activity-list');

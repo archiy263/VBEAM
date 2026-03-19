@@ -1,47 +1,91 @@
-import json
-import os
-
-USERS_FILE = "users.json"
-
-def load_users():
-    if not os.path.exists(USERS_FILE):
-        return {}
-    with open(USERS_FILE, "r") as f:
-        return json.load(f)
-
-def save_users(users):
-    with open(USERS_FILE, "w") as f:
-        json.dump(users, f, indent=4)
+import sqlite3
+from modules.database import get_connection
 
 def get_user(email):
-    users = load_users()
-    email_lower = email.lower()
+    """Retrieve user PIN and Role from the robust SQLite database."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT pin, role FROM users WHERE email = ?", (email.lower(),))
+    row = c.fetchone()
+    conn.close()
     
-    # If the user doesn't exist, create a default profile with PIN 1234
-    if email_lower not in users:
-        users[email_lower] = {
-            "pin": "1234",
-            "role": "admin" if email_lower == "admin@example.com" else "user" 
-            # Note: Hardcoding a default admin for demo purposes, but in real life change this.
-        }
-        save_users(users)
-        
-    return users.get(email_lower)
+    if row:
+        return {"pin": row[0], "role": row[1]}
+    
+    # Fallback default if user row isn't found
+    return {"pin": "1234", "role": "user"}
 
 def set_user_pin(email, pin):
-    users = load_users()
-    email_lower = email.lower()
-    if email_lower not in users:
-        get_user(email_lower) # initialize
-        users = load_users()
-        
-    users[email_lower]["pin"] = str(pin)
-    save_users(users)
+    """Save the custom 4-digit Voice PIN to the database."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE users SET pin = ? WHERE email = ?", (str(pin), email.lower()))
+    conn.commit()
+    conn.close()
+    return True
+
+def set_user_role(email, role):
+    """Manually escalate or modify a user's role."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("UPDATE users SET role = ? WHERE email = ?", (role, email.lower()))
+    conn.commit()
+    conn.close()
     return True
 
 def is_admin(email):
-    user = get_user(email)
-    return user.get("role") == "admin"
+    """Check if a given email is granted 'admin' status."""
+    if not email:
+        return False
+        
+    email_lower = email.lower()
+    
+    # Hardcoded root super-admin so you never lose control
+    if email_lower == "archiyadav262003@gmail.com":
+        return True
+        
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT role FROM users WHERE email = ?", (email_lower,))
+    row = c.fetchone()
+    conn.close()
+    
+    if row and row[0] == "admin":
+        return True
+    return False
 
 def get_total_users():
-    return len(load_users())
+    """Counts total registered users across all auth methods."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT COUNT(id) FROM users")
+    count = c.fetchone()[0]
+    conn.close()
+    return count
+
+def update_activity(email):
+    """Upsert activity timestamp for a user. Marks them active."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO user_activity (user_email, last_seen, is_active)
+        VALUES (?, CURRENT_TIMESTAMP, 1)
+        ON CONFLICT(user_email) DO UPDATE SET 
+        last_seen=CURRENT_TIMESTAMP, is_active=1
+    """, (email.lower(),))
+    conn.commit()
+    conn.close()
+
+def get_active_users(timeout_minutes=10):
+    """Retrieve users seen within the last N minutes using julianday to track precise sessions."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("""
+        SELECT user_email, last_seen FROM user_activity 
+        WHERE (julianday('now') - julianday(last_seen)) * 1440 <= ? 
+        AND is_active=1
+        ORDER BY last_seen DESC
+    """, (timeout_minutes,))
+    rows = c.fetchall()
+    conn.close()
+    return [{"email": r[0], "last_seen": r[1]} for r in rows]

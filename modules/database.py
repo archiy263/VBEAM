@@ -39,6 +39,21 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN is_blocked INTEGER DEFAULT 0")
     except sqlite3.OperationalError:
         pass
+
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN pin TEXT DEFAULT '1234'")
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'")
+    except sqlite3.OperationalError:
+        pass
+
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN google_token BLOB")
+    except sqlite3.OperationalError:
+        pass
     
     # Create Activity Logs Table
     cursor.execute('''
@@ -47,6 +62,16 @@ def init_db():
             user_sub TEXT NOT NULL,
             message TEXT NOT NULL,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Create Active User Tracking Table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_activity (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_email TEXT UNIQUE NOT NULL,
+            last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+            is_active INTEGER DEFAULT 1
         )
     ''')
     

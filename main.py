@@ -99,7 +99,7 @@ reply_state = {}
 telegram_state = {}
 total_emails_sent = 0  # Fix: was missing, caused NameError crash in command_handler
 
-user_pin = "1234"
+user_pin = "1234" # Fallback, override per user inside methods
 
 def get_tg_session_name():
     """Generates a safe session name for Telegram per user."""
@@ -135,16 +135,27 @@ def extract_pin(text):
     digits = re.sub(r'\D', '', text)
     return digits
 
+@app.before_request
+def track_active_user():
+    email = session.get('user_email')
+    if email:
+        try:
+            from modules.user_manager import update_activity
+            update_activity(email)
+        except Exception as e:
+            pass
+
 @app.route("/api/auth/status", methods=["GET"])
 def auth_status():
-    global service
+    from modules.gmail_auth import get_gmail_service
+    email = session.get('user_email')
+    service = get_gmail_service(email)
     if service:
         # User is logged in
         try:
             profile = service.users().getProfile(userId="me").execute()
-            return jsonify({"authenticated": True, "email": profile.get("emailAddress")})
+            return jsonify({"authenticated": True, "email": profile.get("emailAddress", email)})
         except:
-            service = None
             return jsonify({"authenticated": False})
     return jsonify({"authenticated": False})
 
@@ -156,12 +167,13 @@ def oauth_login():
         
 @app.route("/oauth2callback")
 def oauth2callback():
-    global service
-
     try:
-        service = gmail_auth.oauth2callback()
+        creds = gmail_auth.oauth2callback()
+        
+        from googleapiclient.discovery import build
+        temp_service = build("gmail", "v1", credentials=creds)
 
-        profile = service.users().getProfile(userId="me").execute()
+        profile = temp_service.users().getProfile(userId="me").execute()
         email = profile.get("emailAddress")
         name = email.split("@")[0]
 
@@ -169,14 +181,17 @@ def oauth2callback():
         user = get_or_create_google_user(email, name)
 
         if user and "error" in user:
-            service = None
             return render_template("login.html", error="Your account has been blocked by the admin.")
+
+        # Crucial: Save the user's specific OAuth token directly into SQLite
+        gmail_auth.save_user_credentials(email, creds)
 
         add_log("User logged in with Google Auth successfully.")
 
         session['logged_in'] = True
         session['auth_type'] = 'google'
         session['user_email'] = email
+
 
         return redirect("/dashboard")
     
@@ -305,60 +320,46 @@ def admin_page():
 
 @app.route("/api/admin/metrics")
 def admin_metrics():
-    global service, total_emails_sent
-    if service is None:
-        return jsonify({"error": "Unauthorized"}), 401
-    
-    try:
-        gmail_profile = service.users().getProfile(userId="me").execute()
-        email = gmail_profile.get("emailAddress", "")
-        if email != "archiyadav262003@gmail.com":
-            return jsonify({"error": "Access Denied: You are not an Admin"}), 403
-    except:
-        return jsonify({"error": "Unauthorized"}), 401
-    
+    global total_emails_sent
+    from modules.user_manager import is_admin
+    email = session.get('user_email')
+    if not is_admin(email):
+        return jsonify({"error": "Access Denied: You are not an Admin"}), 403
+
     logs = get_activity_logs()
     
     from modules.auth import get_all_users
     users = get_all_users()
     total_users = len(users) if users else 0
 
+    from modules.user_manager import get_active_users
+    active_users = get_active_users(10)
+
     return jsonify({
         "recent_activity": logs,
         "total_users": total_users,
-        "total_emails_sent": total_emails_sent
+        "total_emails_sent": total_emails_sent,
+        "active_users": active_users
     })
 
 @app.route("/api/admin/users", methods=["GET"])
 def admin_get_users():
-    global service
-    if service is None:
-        return jsonify({"error": "Unauthorized"}), 401
-    
-    try:
-        gmail_profile = service.users().getProfile(userId="me").execute()
-        email = gmail_profile.get("emailAddress", "")
-        if email != "archiyadav262003@gmail.com":
-            return jsonify({"error": "Access Denied: You are not an Admin"}), 403
-    except:
-        return jsonify({"error": "Unauthorized"}), 401
-        
+    from modules.user_manager import is_admin
+    email = session.get('user_email')
+    if not is_admin(email):
+        return jsonify({"error": "Access Denied: You are not an Admin"}), 403
+
     from modules.auth import get_all_users
     users = get_all_users()
     return jsonify({"users": users})
 
 @app.route("/api/admin/users/delete", methods=["POST"])
 def admin_delete_user():
-    global service
-    if service is None:
-        return jsonify({"error": "Unauthorized"}), 401
-    try:
-        gmail_profile = service.users().getProfile(userId="me").execute()
-        if gmail_profile.get("emailAddress") != "archiyadav262003@gmail.com":
-            return jsonify({"error": "Access Denied"}), 403
-    except:
-        return jsonify({"error": "Unauthorized"}), 401
-        
+    from modules.user_manager import is_admin
+    user_email = session.get('user_email')
+    if not is_admin(user_email):
+        return jsonify({"error": "Access Denied"}), 403
+
     data = request.json
     email = data.get("email")
     if not email:
@@ -371,16 +372,11 @@ def admin_delete_user():
 
 @app.route("/api/admin/users/update", methods=["POST"])
 def admin_update_user():
-    global service
-    if service is None:
-        return jsonify({"error": "Unauthorized"}), 401
-    try:
-        gmail_profile = service.users().getProfile(userId="me").execute()
-        if gmail_profile.get("emailAddress") != "archiyadav262003@gmail.com":
-            return jsonify({"error": "Access Denied"}), 403
-    except:
-        return jsonify({"error": "Unauthorized"}), 401
-        
+    from modules.user_manager import is_admin
+    user_email = session.get('user_email')
+    if not is_admin(user_email):
+        return jsonify({"error": "Access Denied"}), 403
+
     data = request.json
     current_email = data.get("current_email")
     new_name = data.get("name")
@@ -395,16 +391,11 @@ def admin_update_user():
 
 @app.route("/api/admin/users/block", methods=["POST"])
 def admin_block_user():
-    global service
-    if service is None:
-        return jsonify({"error": "Unauthorized"}), 401
-    try:
-        gmail_profile = service.users().getProfile(userId="me").execute()
-        if gmail_profile.get("emailAddress") != "archiyadav262003@gmail.com":
-            return jsonify({"error": "Access Denied"}), 403
-    except:
-        return jsonify({"error": "Unauthorized"}), 401
-        
+    from modules.user_manager import is_admin
+    user_email = session.get('user_email')
+    if not is_admin(user_email):
+        return jsonify({"error": "Access Denied"}), 403
+
     data = request.json
     email = data.get("email")
     block_status = data.get("block", True)
@@ -418,33 +409,56 @@ def admin_block_user():
 
 @app.route("/api/profile")
 def profile():
-    global service
     from modules.contacts import get_all_contacts
-
-    if service is None:
-        return jsonify({"error": "Unauthorized"}), 401
+    from modules.database import get_connection
+    email = session.get('user_email')
+    
+    if not email:
+        return jsonify({"error": "Not logged in"}), 401
 
     try:
-        gmail_profile = service.users().getProfile(userId="me").execute()
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute("SELECT name, pin FROM users WHERE email = ?", (email.lower(),))
+        row = c.fetchone()
+        conn.close()
         
-        credentials = service._http.credentials
-        import requests
-        headers = {"Authorization": f"Bearer {credentials.token}"}
-        user_info = requests.get("https://www.googleapis.com/oauth2/v2/userinfo", headers=headers).json()
+        name = row[0] if row else "User"
+        pin = row[1] if row else "1234"
 
         contacts = get_all_contacts()
 
         return jsonify({
-            "email": gmail_profile.get("emailAddress"),
-            "name": user_info.get("name"),
+            "email": email,
+            "name": name,
+            "pin": pin,
             "contacts": contacts
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/profile/pin", methods=["POST"])
+def update_profile_pin():
+    email = session.get('user_email')
+    if not email:
+        return jsonify({"error": "Not logged in"}), 401
+    
+    data = request.json
+    new_pin = data.get("pin")
+    if not new_pin or len(str(new_pin)) != 4 or not str(new_pin).isdigit():
+        return jsonify({"error": "Invalid PIN. Must be 4 digits."}), 400
+        
+    from modules.user_manager import set_user_pin
+    if set_user_pin(email, new_pin):
+        return jsonify({"success": True})
+    return jsonify({"error": "Failed to update PIN"}), 500
+
 @app.route("/api/inbox")
 def inbox():
-    global service
+    from modules.gmail_auth import get_gmail_service
+    email = session.get('user_email')
+    service = get_gmail_service(email)
+    
     if service is None:
         return jsonify({"error": "Unauthorized"}), 401
 
@@ -472,17 +486,10 @@ def inbox():
 
 @app.route("/logout")
 def logout():
-    global service
-    service = None
-    session.clear()          # ← clears 'logged_in', 'auth_type', etc.
+    session.clear()
     add_log("User logged out.")
     import os
     import glob
-    # Clean up Gmail token
-    if os.path.exists("token.pickle"):
-        try: os.remove("token.pickle")
-        except: pass
-    # Clean up Telegram sessions
     for f in glob.glob("*.session"):
         try: os.remove(f)
         except: pass
@@ -535,11 +542,18 @@ def update_existing_contact():
 @app.route("/api/command", methods=["POST"])
 def command_handler():
 
-    global service, email_state, reply_state, telegram_state, total_emails_sent, recent_activity
+    global email_state, reply_state, telegram_state, total_emails_sent
 
     from modules.contacts import get_email
     from modules.email_sender import send_email, normalize_email, reply_latest_email, reply_to_contact
     from modules.gmail_reader import read_latest_email, get_email_count
+    
+    from modules.gmail_auth import get_gmail_service
+    from modules.user_manager import get_user
+    
+    user_email = session.get('user_email')
+    service = get_gmail_service(user_email)
+    user_pin = get_user(user_email).get("pin", "1234") if user_email else "1234"
 
     data = request.get_json()
     if not data or "command" not in data:
