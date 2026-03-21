@@ -8,3 +8,4 @@ python-dotenv
 beautifulsoup4
 scikit-learn
 gunicorn
+psycopg2-binary

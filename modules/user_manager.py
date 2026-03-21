@@ -77,15 +77,26 @@ def update_activity(email):
     conn.close()
 
 def get_active_users(timeout_minutes=10):
-    """Retrieve users seen within the last N minutes using julianday to track precise sessions."""
+    """Retrieve users seen within the last N minutes."""
     conn = get_connection()
     c = conn.cursor()
-    c.execute("""
-        SELECT user_email, last_seen FROM user_activity 
-        WHERE (julianday('now') - julianday(last_seen)) * 1440 <= ? 
-        AND is_active=1
-        ORDER BY last_seen DESC
-    """, (timeout_minutes,))
+    
+    from modules.database import DB_TYPE
+    if DB_TYPE == "postgres":
+        c.execute("""
+            SELECT user_email, last_seen FROM user_activity 
+            WHERE EXTRACT(EPOCH FROM (NOW() - last_seen))/60 <= %s 
+            AND is_active=1
+            ORDER BY last_seen DESC
+        """, (timeout_minutes,))
+    else:
+        c.execute("""
+            SELECT user_email, last_seen FROM user_activity 
+            WHERE (julianday('now') - julianday(last_seen)) * 1440 <= ? 
+            AND is_active=1
+            ORDER BY last_seen DESC
+        """, (timeout_minutes,))
+        
     rows = c.fetchall()
     conn.close()
     return [{"email": r[0], "last_seen": r[1]} for r in rows]

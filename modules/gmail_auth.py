@@ -52,7 +52,10 @@ def load_user_credentials(email):
     row = c.fetchone()
     conn.close()
     if row and row[0]:
-        return pickle.loads(row[0])
+        data = row[0]
+        if isinstance(data, memoryview):
+            data = data.tobytes()
+        return pickle.loads(data)
     return None
 
 def get_gmail_service(email):
