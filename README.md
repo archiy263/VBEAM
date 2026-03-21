@@ -77,4 +77,4 @@ The platform has a dynamic Hybrid Database Driver allowing it to bind to Postgre
 - **Frontend**: HTML5, Vanilla JavaScript, TailwindCSS (Glassmorphism UI)
 - **Integrations**: Google Gmail API, Telethon (Telegram), Google Gemini AI
 
-**Developed by Dev & Archi Yadav**
+**Developed by Archi Yadav**
