@@ -6,6 +6,8 @@ import re
 
 
 # Original command map - exact phrase/substring matching
+_AI_CACHE = {}
+
 COMMAND_MAP = {
 
     # START ASSISTANT
@@ -105,12 +107,11 @@ def normalize_command(text: str) -> str:
     if not t:
         return ""
 
+    # 1. Exact local matching (Fast path)
     for key, phrases in COMMAND_MAP.items():
         for phrase in phrases:
             if phrase in t:
                 return key
-
-    # Nothing matched — return raw for state-machine steps
     return t
 
 
@@ -138,18 +139,22 @@ def extract_telegram_raw(raw: str) -> str:
     """
     Extract @username or phone number from spoken text like 'my username is @dev' and 'send to +919000'
     """
+    if "@" in raw:
+        idx = raw.find("@")
+        part = raw[idx:].replace(" ", "")
+        return part
+        
     words = raw.split()
     for w in words:
-        if w.startswith("@") or w.startswith("+"):
+        if w.startswith("+"):
             return w
     
-    # If the user says "username is XYZ" but forgot the @
     if "username is" in raw.lower():
         idx = raw.lower().find("username is") + 11
-        parts = raw[idx:].strip().split()
-        if parts:
-            val = parts[0]
-            if not val.startswith("@") and not val.startswith("+"):
-                return "@" + val
-            return val
+        part = raw[idx:].strip().replace(" ", "")
+        if part:
+            if not part.startswith("@") and not part.startswith("+"):
+                return "@" + part
+            return part
+            
     return None

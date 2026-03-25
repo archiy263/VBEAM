@@ -46,6 +46,10 @@ _TRANSLATIONS = {
         "Telegram message cancelled.": "टेलीग्राम संदेश रद्द किया गया।",
         "Contact not found": "संपर्क नहीं मिला",
         "No contacts saved": "कोई संपर्क सहेजा नहीं गया",
+        "What should I name this contact?": "मुझे इस संपर्क का क्या नाम रखना चाहिए?",
+        "Tell email address": "ईमेल एड्रेस बताएं",
+        "Tell contact name": "संपर्क का नाम बताएं",
+        "Which contact do you want to delete?": "आप किस संपर्क को डिलीट करना चाहते हैं?",
     }
 }
 
@@ -60,6 +64,31 @@ def speak_response(text: str, language: str) -> str:
         return local[text]
         
     if lang == "hi":
+        if text.startswith("Do you want to save ") and " to your contacts? Say yes or no." in text:
+            uname = text.replace("Do you want to save ", "").replace(" to your contacts? Say yes or no.", "")
+            return f"क्या आप {uname} को अपने संपर्कों में सहेजना चाहते हैं? हाँ या ना कहें।"
+
+        if text.startswith("Saved contact ") and ". What message should I send?" in text:
+            cname = text.replace("Saved contact ", "").replace(". What message should I send?", "")
+            return f"{cname} संपर्क सहेजा गया। क्या संदेश भेजूं?"
+
+        if text.startswith("Contact '") and text.endswith("' not found. Please say their Telegram @username directly."):
+            cname = text.split("'")[1]
+            return f"संपर्क '{cname}' नहीं मिला। कृपया सीधे उनका टेलीग्राम @username बताएं।"
+
+        if text.startswith("Sending to ") and ": '" in text and "'. Say yes to confirm." in text:
+            parts = text.split(": '")
+            uname = parts[0].replace("Sending to ", "")
+            msg = parts[1].replace("'. Say yes to confirm.", "")
+            return f"{uname} को भेज रहे हैं: '{msg}'। पुष्टि के लिए हाँ कहें।"
+
+        if text.startswith("Sending email to "):
+            import re
+            match = re.search(r"Sending email to (.+?)\. Subject: (.+?)\. Message: (.+?)\. Say yes to confirm or no to cancel\.", text)
+            if match:
+                to_part, subj_part, msg_part = match.groups()
+                return f"{to_part} को ईमेल भेज रहे हैं। विषय: {subj_part}। संदेश: {msg_part}। पुष्टि के लिए हाँ, रद्द के लिए नहीं।"
+
         if text.startswith("You have ") and "emails" in text:
             count = text.replace("You have ", "").replace(" emails", "").strip()
             return f"आपके पास {count} ईमेल हैं।"
@@ -97,6 +126,8 @@ service = None
 email_state = {}
 reply_state = {}
 telegram_state = {}
+add_contact_state = {}
+delete_contact_state = {}
 total_emails_sent = 0  # Fix: was missing, caused NameError crash in command_handler
 
 user_pin = "1234" # Fallback, override per user inside methods
@@ -542,7 +573,7 @@ def update_existing_contact():
 @app.route("/api/command", methods=["POST"])
 def command_handler():
 
-    global email_state, reply_state, telegram_state, total_emails_sent
+    global email_state, reply_state, telegram_state, add_contact_state, delete_contact_state, total_emails_sent
 
     from modules.contacts import get_email
     from modules.email_sender import send_email, normalize_email, reply_latest_email, reply_to_contact
@@ -590,6 +621,9 @@ def command_handler():
     if "stop" in command:
         email_state = {}
         reply_state = {}
+        telegram_state = {}
+        add_contact_state = {}
+        delete_contact_state = {}
         return jsonify({"response": translate_text("Assistant stopped", language),
         "language": language
             })
@@ -671,6 +705,10 @@ def command_handler():
     # EMAIL STATE FLOW
 
     if email_state.get("step") == "recipient":
+        if language.startswith("hi"):
+            from modules.gemini_ai import normalize_phonetic
+            command = normalize_phonetic(command)
+
         from modules.command_parser import extract_entity
         from modules.email_sender import normalize_email
         from modules.contacts import get_email
@@ -731,7 +769,7 @@ def command_handler():
         subj = email_state.get('subject', '')
         body_preview = command[:80]
         confirm_text = f"Sending email to {to}. Subject: {subj}. Message: {body_preview}. Say yes to confirm or no to cancel."
-        return jsonify({"response": confirm_text, "language": language})
+        return jsonify({"response": speak_response(confirm_text, language), "language": language})
 
     if email_state.get("step") == "confirm":
         if any(word in command for word in ["yes", "yeah", "confirm", "conform", "send", "okay", "ok", "sure", "haan", "हाँ", "हां", "ha","हाँ" , "हां", "ओके", "बिलकुल"]):
@@ -835,30 +873,67 @@ def command_handler():
             return jsonify({"response": translate_text("Invalid PIN. Reply not sent.", language), "language": language})
 
 
-    # CONTACT MANAGEMENT
+    # CONTACT MANAGEMENT FLOWS
 
-    # Add Contact by Voice
-    if command.startswith("add contact"):
-        parts = command.replace("add contact", "").strip().split()
-        if len(parts) < 2:
-            return jsonify({"response": speak_response("Say add contact name email", language), "language": language})
+    if add_contact_state.get("step") == "name":
+        add_contact_state["name"] = command.strip()
+        add_contact_state["step"] = "email"
+        return jsonify({"response": speak_response("Tell email address", language), "language": language})
 
-        name = parts[0]
-        email = parts[1]
-
+    if add_contact_state.get("step") == "email":
+        from modules.email_sender import normalize_email
+        if language.startswith("hi"):
+            from modules.gemini_ai import normalize_phonetic
+            command = normalize_phonetic(command)
+        
+        email = normalize_email(command) or command.replace(" ", "").lower()
+        
+        name = add_contact_state.get("name")
         from modules.contacts import add_contact
         add_contact(name, email)
+        
+        add_contact_state.clear()
         return jsonify({"response": speak_response(f"Contact {name} added successfully", language), "language": language})
 
-    # Delete Contact by Voice
-    if command.startswith("delete contact"):
-        name = command.replace("delete contact", "").strip()
-
+    if delete_contact_state.get("step") == "name":
+        name = command.strip()
         from modules.contacts import delete_contact
+        delete_contact_state.clear()
+        
         if delete_contact(name):
             return jsonify({"response": speak_response(f"Contact {name} deleted", language), "language": language})
         else:
             return jsonify({"response": speak_response("Contact not found", language), "language": language})
+
+    # Add Contact by Voice (Initial trigger)
+    if command.startswith("add contact"):
+        parts = command.replace("add contact", "").strip().split()
+        if len(parts) >= 2:
+            name = parts[0]
+            email = parts[1]
+            from modules.contacts import add_contact
+            add_contact(name, email)
+            return jsonify({"response": speak_response(f"Contact {name} added successfully", language), "language": language})
+        elif len(parts) == 1:
+            add_contact_state["step"] = "email"
+            add_contact_state["name"] = parts[0]
+            return jsonify({"response": speak_response("Tell email address", language), "language": language})
+        else:
+            add_contact_state["step"] = "name"
+            return jsonify({"response": speak_response("Tell contact name", language), "language": language})
+
+    # Delete Contact by Voice (Initial trigger)
+    if command.startswith("delete contact"):
+        name = command.replace("delete contact", "").strip()
+        if name:
+            from modules.contacts import delete_contact
+            if delete_contact(name):
+                return jsonify({"response": speak_response(f"Contact {name} deleted", language), "language": language})
+            else:
+                return jsonify({"response": speak_response("Contact not found", language), "language": language})
+        else:
+            delete_contact_state["step"] = "name"
+            return jsonify({"response": speak_response("Which contact do you want to delete?", language), "language": language})
 
     # Show Contacts by Voice
     if "all contact" in command:
@@ -876,6 +951,10 @@ def command_handler():
 
     # ── TELEGRAM STATE MACHINE (now fully guided) ─────────────────────────
     if telegram_state.get("step") == "recipient":
+        if language.startswith("hi"):
+            from modules.gemini_ai import normalize_phonetic
+            command = normalize_phonetic(command)
+
         from modules.command_parser import extract_entity, extract_telegram_raw
         from modules.contacts import get_telegram
         candidate = entity if entity else extract_entity(command)
@@ -885,8 +964,8 @@ def command_handler():
             raw_username = extract_telegram_raw(command)
             if raw_username:
                 username = raw_username
-            elif command.startswith("@") or len(command.split()) == 1:
-                username = command.strip()
+            else:
+                username = "@" + command.replace(" ", "")
                 
         if not username:
             return jsonify({"response": speak_response(
@@ -925,7 +1004,7 @@ def command_handler():
         telegram_state["pending_message"] = command
         telegram_state["step"] = "confirm"
         uname = telegram_state.get("username", "")
-        return jsonify({"response": f"Sending to {uname}: '{command}'. Say yes to confirm.", "language": language})
+        return jsonify({"response": speak_response(f"Sending to {uname}: '{command}'. Say yes to confirm.", language), "language": language})
 
     if telegram_state.get("step") == "confirm":
         if any(w in command for w in ["yes", "haan", "ok", "confirm", "sure", "हाँ" , "हां", "ओके", "बिलकुल"]):

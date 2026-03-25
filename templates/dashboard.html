@@ -497,12 +497,36 @@
             "tell subject", "tell message", "tell your reply",
             "say your 4-digit", "say yes to confirm",
             "send telegram to", "telegram @username",
-            "message should i send", "sending to"
+            "message should i send", "sending to",
+            "which contact do you want to delete",
+            "ईमेल बताएं", "प्राप्तकर्ता का नाम", "विषय बताएं", "संदेश बताएं", "जवाब बताएं",
+            "पुष्टि के लिए हाँ", "अपना 4-अंकीय पिन", "हाँ या ना कहें",
+            "किस संपर्क को", "टेलीग्राम भेजूं", "क्या संदेश भेजूं", "भेज रहे हैं",
+            "संपर्क का नाम बताएं", "ईमेल एड्रेस बताएं", "डिलीट करना चाहते हैं"
         ];
         function checkForStepPrompt(text) {
             const lower = text.toLowerCase();
             return STEP_PROMPTS.some(p => lower.includes(p));
         }
+
+        // Force English Speech Recognition momentarily for tricky inputs (emails/usernames)
+        let forceEnglishRec = false;
+        const FORCE_EN_PROMPTS = [
+            "प्राप्तकर्ता का नाम या ईमेल बताएं", 
+            "किस संपर्क को टेलीग्राम भेजूं", 
+            "कृपया सीधे उनका टेलीग्राम @username",
+            "ईमेल एड्रेस बताएं",
+            "tell recipient contact name", 
+            "which contact should i send telegram to",
+            "telegram @username directly",
+            "tell email address"
+        ];
+
+        function checkForceEnglish(text) {
+            const lower = text.toLowerCase();
+            forceEnglishRec = FORCE_EN_PROMPTS.some(p => lower.includes(p.toLowerCase()));
+        }
+
         function showManualInput() {
             const row = document.getElementById('manual-input-row');
             row.classList.remove('hidden');
@@ -553,6 +577,7 @@
             const reply = data.response || '';
             if (reply && reply !== 'Command not understood') {
                 speakText(reply, bcp47Lang);
+                checkForceEnglish(reply); // Set STT flag for next voice input
                 if (checkForStepPrompt(reply)) {
                     showManualInput();
                 } else {
@@ -586,8 +611,15 @@
             }
             const bcp47Lang = document.getElementById('lang-select').value;
             const backendLang = langToBackend[bcp47Lang] || "en";
+            
+            let sttLang = bcp47Lang;
+            if (forceEnglishRec) {
+                sttLang = "en-IN"; // Temporarily force English STT
+                console.log("Forcing English STT for this prompt");
+            }
+
             const rec = new SpeechRec();
-            rec.lang = bcp47Lang;
+            rec.lang = sttLang;
             
             // USE CONTINUOUS + INTERIM TO CAPTURE FULL SENTENCES
             rec.continuous = true;

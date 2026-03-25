@@ -60,14 +60,38 @@ def translate_text(text, target_lang):
     try:
         prompt = f"""
         Translate this text into {target_lang} language:
-
-        {text}
+        '{text}'
+        Provide ONLY the translated text, no quotes or extra words.
+        CRITICAL RULE: DO NOT translate any email addresses or usernames (like example@domain.com or @username), leave them exactly as they are in English.
         """
 
         response = model.generate_content(prompt)
         return response.text.strip()
+    except Exception as e:
+        print(f"Translation error: {e}")
+        return text
 
-    except:
+def normalize_phonetic(text: str) -> str:
+    """Uses Gemini to convert Hindi phonetic STT (like एआरसीएचएटदरेटgmail.com) into proper English email/username."""
+    try:
+        prompt = f"""
+        You are fixing speech-to-text formatting.
+        Convert the following spoken text (which may contain Hindi phonetics of English spelling) into a valid English email address, telegram username, or contact name.
+        Rules:
+        - "एट द रेट" -> "@"
+        - "डॉट कॉम" -> ".com"
+        - Convert spelled-out letters in Hindi (e.g. "ए", "बी", "सी") into English letters (A, B, C).
+        - If it's just a name like "देव उपाध्याय ऑफिशियल", convert it to English spelling like "Dev Upadhyay Official".
+        - If it has an "@" symbol, keep it exactly (don't add extra spaces).
+        - Return ONLY the final converted string, without quotes or extra explanation.
+        
+        Input: '{text}'
+        """
+        response = model.generate_content(prompt)
+        res = response.text.strip().lower()
+        return res
+    except Exception as e:
+        print(f"Phonetic normalization error: {e}")
         return text
     
 def analyze_command(text):
@@ -104,3 +128,5 @@ User command:
     except Exception as e:
         print("Gemini command analysis error:", e)
         return "en", text.lower()
+
+
